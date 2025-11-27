@@ -35,19 +35,7 @@
         .header-banner { width: 100%; max-width: 400px; height: 120px; border-radius: 20px; object-fit: cover; margin-bottom: 20px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); border: 2px solid rgba(255,255,255,0.1); }
         .hero-title { font-size: 42px; font-weight: 800; color: white; text-shadow: 0 4px 20px rgba(0,0,0,0.5); margin-bottom: 5px; letter-spacing: -1px; line-height: 1.1; }
         .hero-subtitle { font-size: 16px; color: rgba(255,255,255,0.8); margin-bottom: 30px; font-weight: 300; letter-spacing: 1px; text-transform: uppercase; }
-        
-        .glass-card { 
-            background: rgba(18, 25, 40, 0.75); 
-            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); 
-            border-radius: 24px; 
-            padding: 40px 30px 50px 30px; 
-            width: 100%; max-width: 340px; 
-            display: flex; flex-direction: column; align-items: center; 
-            border: 1px solid rgba(255, 255, 255, 0.1); 
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); 
-            position: relative; 
-        }
-
+        .glass-card { background: rgba(18, 25, 40, 0.75); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border-radius: 24px; padding: 40px 30px 50px 30px; width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5); position: relative; }
         .app-icon { width: 80px; height: 80px; object-fit: contain; margin-bottom: 15px; filter: drop-shadow(0 0 10px rgba(185, 29, 115, 0.4)); }
         .auth-input { width: 100%; padding: 14px 20px; margin-bottom: 15px; background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.15); color: white; border-radius: 12px; font-size: 16px; outline: none; text-align: center; font-family: 'Kanit', sans-serif; transition: 0.3s; }
         .auth-input:focus { border-color: var(--primary-color); background: rgba(0,0,0,0.6); box-shadow: 0 0 0 3px rgba(185, 29, 115, 0.2); }
@@ -59,25 +47,9 @@
         .status-dot { width: 6px; height: 6px; background-color: #2ed573; border-radius: 50%; box-shadow: 0 0 8px #2ed573; animation: pulse 2s infinite; }
         @keyframes pulse { 0% { opacity: 0.5; transform: scale(1); } 50% { opacity: 1; transform: scale(1.2); } 100% { opacity: 0.5; transform: scale(1); } }
         
-        /* Glass Pill Button */
-        .glass-pill-btn {
-            background: rgba(255,255,255,0.1); 
-            border: 1px solid rgba(255,255,255,0.2); 
-            color: white; 
-            padding: 6px 12px; 
-            border-radius: 30px; 
-            cursor: pointer; 
-            display: flex; 
-            align-items: center; 
-            gap: 6px; 
-            font-size: 12px; 
-            backdrop-filter: blur(5px); 
-            transition: 0.3s;
-            height: 32px;
-        }
+        .glass-pill-btn { background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); color: white; padding: 6px 12px; border-radius: 30px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 12px; backdrop-filter: blur(5px); transition: 0.3s; height: 32px; }
         .glass-pill-btn:hover { background: rgba(255,255,255,0.2); border-color: var(--primary-color); }
         .glass-pill-btn:active { transform: scale(0.95); }
-        
         .login-lang-pos { position: absolute; bottom: 20px; left: 20px; z-index: 10; }
         .map-lang-pos { position: absolute; top: 15px; left: 15px; z-index: 900; }
 
@@ -87,16 +59,13 @@
         .leaflet-container { background: #0f172a !important; }
         #map-report, #map-dashboard { height: 100%; width: 100%; } #map-report { height: 45%; }
         #map-dashboard .leaflet-tile-pane { filter: invert(100%) hue-rotate(190deg) brightness(85%) contrast(90%); }
+        
         #form-container { height: 55%; background: var(--bg-color); padding: 20px 20px 150px 20px; box-sizing: border-box; border-top: 1px solid rgba(255,255,255,0.1); border-radius: 20px 20px 0 0; margin-top: -15px; position: relative; z-index: 500; overflow-y: auto; }
         
-        /* Tab Bar Layout */
         .tab-bar { position: fixed; bottom: 0; left: 0; right: 0; height: 65px; background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(10px); border-top: 1px solid rgba(255,255,255,0.05); display: flex; z-index: 9999; padding-bottom: var(--safe-bottom); }
         .tab-btn { flex: 1; border: none; background: transparent; color: #64748b; font-family: 'Kanit'; font-size: 10px; display: flex; flex-direction: column; align-items: center; justify-content: center; }
         .tab-btn span:first-child { font-size: 20px; margin-bottom: 2px; } .tab-btn.active { color: var(--primary-color); }
-        
-        /* Logout Tab Style */
-        .tab-logout { color: #ff4757 !important; opacity: 0.7; }
-        .tab-logout:hover { opacity: 1; }
+        .tab-logout { color: #ff4757 !important; opacity: 0.7; } .tab-logout:hover { opacity: 1; }
 
         .mode-switch { display: flex; margin-bottom: 15px; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px; border: 1px solid rgba(255,255,255,0.05); }
         .mode-btn { flex: 1; padding: 8px; border: none; background: transparent; color: #94a3b8; border-radius: 8px; font-weight: 500; font-size: 13px; } .mode-btn.active { background: #1e293b; color: white; }
@@ -105,6 +74,7 @@
         select option { background-color: #1e293b; color: white; }
         select option[disabled] { color: #aaa; font-style: italic; }
         .submit-btn { width: 100%; padding: 14px; background: var(--primary-gradient); border: none; border-radius: 12px; font-weight: 600; color: white; margin-top: 10px; cursor: pointer; font-size: 16px; box-shadow: 0 4px 15px rgba(185, 29, 115, 0.3); margin-bottom: 80px; }
+        
         #feed-wrapper { height: 100%; overflow-y: auto; background: var(--bg-color); padding: 15px 15px 100px 15px; box-sizing: border-box; }
         .feed-card { background: #1e293b; border-left: 4px solid #444; margin-bottom: 12px; padding: 15px; border-radius: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); position: relative; }
         .map-legend { position: absolute; top: 10px; right: 10px; background: rgba(15, 23, 42, 0.95); padding: 10px; border-radius: 8px; font-size: 11px; z-index: 2000; border: 1px solid rgba(255,255,255,0.1); color: #cbd5e1; box-shadow: 0 5px 15px rgba(0,0,0,0.5); max-height: 200px; overflow-y: auto; }
@@ -116,6 +86,16 @@
         .header-tools { display: flex; gap: 8px; align-items: center; }
         .spin-anim { animation: spin 0.8s linear; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
+
+        /* 🔥 OFFLINE STATUS INDICATOR */
+        #sync-status {
+            display: none; /* Hidden by default */
+            background: rgba(255, 193, 7, 0.2); 
+            border: 1px solid #ffc107; 
+            color: #ffc107;
+            font-size: 11px; padding: 4px 10px; border-radius: 20px;
+            align-items: center; gap: 5px;
+        }
     </style>
 </head>
 <body>
@@ -180,7 +160,7 @@
             <div id="form-container">
                 <div class="user-header" style="display:flex; justify-content:space-between; color:#94a3b8; font-size:12px; margin-bottom:10px;">
                     <span id="display-username">👤 Guest</span>
-                    </div>
+                </div>
                 <div class="mode-switch">
                     <button class="mode-btn active" id="btn-mode-point" onclick="setMode('point')">📍 Pin</button>
                     <button class="mode-btn" id="btn-mode-line" onclick="setMode('line')">〰️ Route</button>
@@ -210,7 +190,10 @@
         <div id="page-feed" class="page-content">
             <div id="feed-wrapper">
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 15px;">
-                    <h2 style="color:white; margin:0; font-size:20px;" id="header-feed">Journey Log</h2>
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <h2 style="color:white; margin:0; font-size:20px;" id="header-feed">Journey Log</h2>
+                        <div id="sync-status">📡 <span id="sync-count">0</span> Pending</div>
+                    </div>
                     <div class="header-tools">
                         <div class="glass-pill-btn" onclick="toggleLanguage()">
                             <img id="lang-img" class="lang-flag" src="https://flagcdn.com/24x18/gb.png" style="width:16px;">
@@ -266,17 +249,98 @@
         var myLocationMarker = null;
         var accCircle = null, watchId = null, trackingStarted = false, startTime = 0, timerInterval = null;
 
+        // 🔥 OFFLINE LOGIC CONSTANTS
+        const PENDING_KEY = 'trek_pending_uploads';
+
+        // 🔥 MODIFIED: Call API wrapper to handle online/offline
         async function callApi(action, data = {}) {
             if (action === 'getData') {
+                // Read only - if offline, return empty or cached? For now return empty/fail safely
+                if (!navigator.onLine) { console.log("Offline: Cannot fetch data"); return []; }
                 try { const response = await fetch(API_URL + "?action=getData"); return await response.json(); } catch(e) { console.error(e); return []; }
             } else {
+                // Write operations (Save, Delete, Register, Login)
+                const payload = { action: action, ...data };
+                
+                // 🔥 Case: Offline -> Save to Local Storage (Only for 'saveData')
+                if (!navigator.onLine && action === 'saveData') {
+                    saveOffline(payload);
+                    return { status: "OFFLINE_SAVED", message: "Saved offline" };
+                }
+
+                // Case: Online -> Send to Server
                 try {
-                    const payload = { action: action, ...data };
                     const response = await fetch(API_URL, { method: "POST", body: JSON.stringify(payload), headers: { "Content-Type": "text/plain;charset=utf-8" } });
                     return await response.json();
-                } catch(e) { console.error(e); return { status: "FAIL", message: e.toString() }; }
+                } catch(e) { 
+                    console.error(e); 
+                    // If fetch fails (network drop mid-request), try to save offline if it was a save op
+                    if (action === 'saveData') {
+                        saveOffline(payload);
+                        return { status: "OFFLINE_SAVED", message: "Network failed, saved offline" };
+                    }
+                    return { status: "FAIL", message: e.toString() }; 
+                }
             }
         }
+
+        // 🔥 NEW: Save to Local Storage
+        function saveOffline(payload) {
+            let pending = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+            pending.push(payload);
+            localStorage.setItem(PENDING_KEY, JSON.stringify(pending));
+            updateSyncStatus();
+        }
+
+        // 🔥 NEW: Sync Data when Online
+        async function syncOfflineData() {
+            if (!navigator.onLine) return;
+            
+            let pending = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+            if (pending.length === 0) { updateSyncStatus(); return; }
+
+            console.log("Syncing " + pending.length + " items...");
+            
+            // Process queue one by one
+            let remaining = [];
+            for (let item of pending) {
+                try {
+                    // Send to API
+                    const response = await fetch(API_URL, { method: "POST", body: JSON.stringify(item), headers: { "Content-Type": "text/plain;charset=utf-8" } });
+                    const resJson = await response.json();
+                    if (resJson.status !== 'SUCCESS') {
+                        remaining.push(item); // Keep if server rejected
+                    }
+                } catch(e) {
+                    remaining.push(item); // Keep if network error
+                }
+            }
+
+            localStorage.setItem(PENDING_KEY, JSON.stringify(remaining));
+            updateSyncStatus();
+            
+            if (remaining.length === 0) {
+                alert(curLang === 'th' ? "✅ อัปโหลดข้อมูลออฟไลน์เรียบร้อย!" : "✅ Offline data synced!");
+                loadAllData(); // Refresh feed
+            }
+        }
+
+        // 🔥 NEW: Update UI Indicator
+        function updateSyncStatus() {
+            let pending = JSON.parse(localStorage.getItem(PENDING_KEY) || "[]");
+            const badge = document.getElementById('sync-status');
+            const count = document.getElementById('sync-count');
+            if (pending.length > 0) {
+                badge.style.display = 'flex';
+                count.innerText = pending.length;
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        // 🔥 Listen for Network Status
+        window.addEventListener('online', syncOfflineData);
+        window.addEventListener('load', () => { updateSyncStatus(); syncOfflineData(); });
 
         const langData = {
             th: {
@@ -288,6 +352,7 @@
                 startBtn: "▶️ เริ่ม", stopBtn: "⏹️ หยุด", 
                 coordHint: "แตะแผนที่เพื่อระบุ ↗", descPlace: "รายละเอียด...", saveBtn: "บันทึกข้อมูล", saveRoute: "บันทึกเส้นทาง", feedHeader: "บันทึกการเดินทาง", feedSearch: "ค้นหา...", tab1: "ระบุ", tab2: "บันทึก", tab3: "แผนที่", confirmLogout: "ต้องการออกจากระบบ?", loading: "กำลังเชื่อมต่อ...", processing: "กำลังบันทึก...", alertPin: "⚠️ ระบุตำแหน่งก่อนครับ", alertName: "📝 ตั้งชื่อเส้นทาง:", alertSave: "✅ บันทึกแล้ว!", alertLoginFail: "❌ ชื่อผู้ใช้ผิด", alertStopTrack: "กรุณากดปุ่มหยุดก่อน",
                 txtLogin: "กำลังเข้าสู่ระบบ...",
+                alertOffline: "⚠️ ไม่มีอินเทอร์เน็ต! บันทึกลงเครื่องแล้ว จะส่งให้อัตโนมัติเมื่อมีเน็ต",
                 selectHint: "-- กรุณาเลือกประเภท --", alertSelect: "⚠️ กรุณาเลือกประเภทสถานที่ก่อนบันทึกครับ",
                 options: [ {val: "ร้านอาหาร", txt: "🍴 ร้านอาหาร"}, {val: "คาเฟ่", txt: "☕ คาเฟ่"}, {val: "ที่พัก", txt: "🏨 ที่พัก"}, {val: "สถานที่ท่องเที่ยว", txt: "🗿 ท่องเที่ยว"}, {val: "จุดชมวิว", txt: "📸 จุดชมวิว"}, {val: "จุดกางเต็นท์", txt: "⛺ กางเต็นท์"}, {val: "แหล่งน้ำ", txt: "💧 แหล่งน้ำ"}, {val: "ที่จอดรถ", txt: "🅿️ ที่จอดรถ"}, {val: "ทางเดินเท้า", txt: "🥾 เดินเท้า"}, {val: "จุดอันตราย", txt: "⚠️ อันตราย"}, {val: "อื่นๆ", txt: "🚩 อื่นๆ"} ],
                 gpsFound: "📍 พบแล้ว! (แม่นยำ: ", gpsWait: "📡 กำลังค้นหาสัญญาณ...", delConfirm: "ลบข้อมูลนี้?", delSuccess: "✅ ลบแล้ว", delFail: "❌ ลบไม่ได้"
@@ -301,6 +366,7 @@
                 startBtn: "▶️ START", stopBtn: "⏹️ STOP", 
                 coordHint: "Tap map to pin ↗", descPlace: "Description...", saveBtn: "SAVE DATA", saveRoute: "SAVE ROUTE", feedHeader: "Journey Log", feedSearch: "Search...", tab1: "Pin", tab2: "Log", tab3: "Map", confirmLogout: "Confirm Logout?", loading: "CONNECTING...", processing: "SAVING...", alertPin: "⚠️ Mark location first", alertName: "📝 Route Name:", alertSave: "✅ Saved!", alertLoginFail: "❌ Invalid User/Pass", alertStopTrack: "Please press STOP first.",
                 txtLogin: "LOGGING IN...",
+                alertOffline: "⚠️ No Internet! Saved to device. Will sync automatically when online.",
                 selectHint: "-- Please Select Type --", alertSelect: "⚠️ Please select a type first",
                 options: [ {val: "ร้านอาหาร", txt: "🍴 Restaurant"}, {val: "คาเฟ่", txt: "☕ Cafe"}, {val: "ที่พัก", txt: "🏨 Hotel"}, {val: "สถานที่ท่องเที่ยว", txt: "🗿 Attraction"}, {val: "จุดชมวิว", txt: "📸 Viewpoint"}, {val: "จุดกางเต็นท์", txt: "⛺ Campsite"}, {val: "แหล่งน้ำ", txt: "💧 Water Source"}, {val: "ที่จอดรถ", txt: "🅿️ Parking"}, {val: "ทางเดินเท้า", txt: "🥾 Hiking Trail"}, {val: "จุดอันตราย", txt: "⚠️ Danger"}, {val: "อื่นๆ", txt: "🚩 Other"} ],
                 gpsWait: "📡 Locating...", gpsFound: "📍 Locked! (Acc: ", delConfirm: "Delete this item?", delSuccess: "✅ Deleted", delFail: "❌ Failed"
@@ -330,7 +396,6 @@
             document.getElementById('reg-pass').placeholder = t.phPass; 
             document.getElementById('reg-name').placeholder = t.phName;
             
-            // 🔥 UPDATE: Set logout text
             const tabLogoutText = document.getElementById('tab-logout-text'); if(tabLogoutText) tabLogoutText.innerText = t.logout;
             
             document.getElementById('btn-mode-point').innerText = t.modePoint; 
@@ -365,7 +430,7 @@
                 sel.appendChild(op); 
             });
 
-            // 🔥 Logic: Hide Dropdown in Route/Track
+            // Logic: Hide Dropdown in Route/Track
             if (currentMode === 'line' || currentMode === 'track') { 
                 sel.style.display = 'none'; 
             } else { 
@@ -467,8 +532,77 @@
         function doRegister() { var n=document.getElementById('reg-name').value; var u=document.getElementById('reg-user').value; var p=document.getElementById('reg-pass').value; if(!n||!u||!p) return; showLoading(true, getTxt('loading')); callApi('registerUser', { username: u, password: p, name: n }).then(res => { showLoading(false); if(res.status==='SUCCESS'){ alert("✅ OK"); showLogin(); } else { alert("Error: " + res.status); } }); }
         function doLogout() { if(confirm(getTxt('confirmLogout'))) { sessionStorage.clear(); currentUser=null; location.reload(); } }
         function showLoading(s, t) { var o=document.getElementById('loading-overlay'); if(s){ document.getElementById('loading-text').innerText=t||"Loading..."; o.style.display='flex'; } else { o.style.display='none'; } }
-        function submitReport() { if (watchId !== null && trackingStarted) { alert(getTxt('alertStopTrack')); return; } if(linePoints.length===0){alert(getTxt('alertPin'));return;} var s = (currentMode==='line' || currentMode==='track') ? (prompt(getTxt('alertName'))||"") : currentAddress; if((currentMode==='line' || currentMode==='track') && s==="") return; showLoading(true, getTxt('processing')); var l=document.getElementById('level').value; var d=document.getElementById('desc').value; var lat=linePoints[0][0]; var lon=linePoints[0][1]; var p=(currentMode==='line' || currentMode==='track')?JSON.stringify(linePoints):""; var r=currentUser?currentUser.username:"Guest"; var payload = { lat: lat, lon: lon, level: l, desc: d, type: currentMode, pathData: p, locationName: currentAddress, searchLocation: s, province: currentProvince, reporterName: r }; callApi('saveData', payload).then(res => { showLoading(false); if(res.status === 'SUCCESS') { alert(getTxt('alertSave')); resetForm(); loadAllData(); switchTab('feed'); } else { alert("Save Error: " + res.message); } }); }
         
+        function submitReport() { 
+            if (watchId !== null && trackingStarted) { alert(getTxt('alertStopTrack')); return; }
+            if(linePoints.length===0){alert(getTxt('alertPin'));return;} 
+            
+            var l = document.getElementById('level').value;
+            // Check dropdown only if visible (Pin mode)
+            if (currentMode === 'point' && l === "") { alert(getTxt('alertSelect')); return; }
+
+            var s = (currentMode==='line' || currentMode==='track') ? (prompt(getTxt('alertName'))||"") : currentAddress; 
+            if((currentMode==='line' || currentMode==='track') && s==="") return; 
+            
+            showLoading(true, getTxt('processing')); 
+            var d=document.getElementById('desc').value; var lat=linePoints[0][0]; var lon=linePoints[0][1]; var p=(currentMode==='line' || currentMode==='track')?JSON.stringify(linePoints):""; var r=currentUser?currentUser.username:"Guest"; 
+            
+            // Set default value for route/track if hidden
+            if(currentMode !== 'point') l = "ทางเดินเท้า";
+
+            var payload = { lat: lat, lon: lon, level: l, desc: d, type: currentMode, pathData: p, locationName: currentAddress, searchLocation: s, province: currentProvince, reporterName: r }; 
+            callApi('saveData', payload).then(res => { showLoading(false); 
+                if(res.status === 'SUCCESS') { 
+                    alert(getTxt('alertSave')); resetForm(); loadAllData(); switchTab('feed'); 
+                } else if(res.status === 'OFFLINE_SAVED') {
+                    alert(getTxt('alertOffline')); resetForm(); switchTab('feed');
+                } else { 
+                    alert("Save Error: " + res.message); 
+                } 
+            }); 
+        }
+
+        function setMode(m) { 
+            if (watchId !== null) toggleTracking(false); 
+            currentMode=m; 
+            document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); 
+            
+            const levelSelect = document.getElementById('level'); 
+            const trekForm = document.getElementById('trekForm'); 
+            const trackingUI = document.getElementById('tracking-ui'); 
+            
+            // 🔥 Logic: Hide Dropdown in Route/Track
+            if (m === 'point') { 
+                document.getElementById('btn-mode-'+m).classList.add('active'); 
+                trackingUI.style.display = 'none'; 
+                trekForm.style.display = 'block'; 
+                
+                levelSelect.style.display = 'block'; // Show
+                levelSelect.disabled = false; 
+            } else if (m === 'line') { 
+                document.getElementById('btn-mode-line').classList.add('active');
+                trackingUI.style.display = 'none'; 
+                trekForm.style.display = 'block';
+                
+                levelSelect.style.display = 'none'; // Hide
+                levelSelect.value = "ทางเดินเท้า"; // Set default
+            } else if (m === 'track') { 
+                document.getElementById('btn-mode-track').classList.add('active'); 
+                
+                levelSelect.style.display = 'none'; // Hide
+                levelSelect.value = "ทางเดินเท้า"; // Set default
+
+                trackingUI.style.display = 'block'; 
+                trekForm.style.display = 'none'; 
+                document.getElementById('btn-track-start').style.display = 'block'; 
+                document.getElementById('btn-track-stop').style.display = 'none'; 
+                document.getElementById('timer-display-start').innerText = "00:00:00"; 
+            } 
+            resetForm(); 
+            if(m==='line' || m==='track') document.querySelector('.submit-btn').innerText=getTxt('saveRoute'); else document.querySelector('.submit-btn').innerText=getTxt('saveBtn'); 
+            document.getElementById('undoBtn').style.display=(m!=='point')?'block':'none'; 
+        }
+
         // 🔥 Added Reset for Dropdown & Visibility
         function resetForm() { 
             if (watchId !== null) toggleTracking(false); 
