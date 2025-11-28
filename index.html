@@ -933,7 +933,7 @@
             if (shouldStart) {
                 if (!navigator.geolocation) { alert("GPS not supported"); return; }
                 document.getElementById('coord-text').innerText = getTxt('gpsWait');
-                watchId = navigator.geolocation.watchPosition(onPositionUpdate, (err) => { alert("Tracking failed: " + err.message); }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
+                watchId = navigator.geolocation.watchPosition(onPositionUpdate, (err) => { console.log("Tracking failed (Silent): " + err.message); }, { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 });
                 startTimer(); trackingStarted = true;
                 document.getElementById('btn-track-start').style.display = 'none'; document.getElementById('btn-track-stop').style.display = 'block'; trekForm.style.display = 'none'; document.getElementById('coord-text').innerText = `🏃 Tracking...`;
             } else {
