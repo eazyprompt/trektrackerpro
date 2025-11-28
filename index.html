@@ -616,6 +616,7 @@ function startInternalNav(destLat, destLon) {
                         waypoints: [startLatLng, currentDestLatLng],
                         routeWhileDragging: false,
                         showAlternatives: false,
+			fitSelectedRoutes: false,  // ❌ ห้ามซูมเข้าออกอัตโนมัติเมื่อคำนวณเส้นทางเสร็จ
                         lineOptions: { styles: [{color: '#2ed573', opacity: 0.8, weight: 6}] },
                         createMarker: function(i, wp, nWps) {
                             if (i === 0) return null; // ไม่แสดงหมุดจุดเริ่ม (เพราะเรามีจุดสีฟ้าแล้ว)
