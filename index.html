@@ -379,30 +379,39 @@
             overlay.classList.remove('sos-flashing');
             if (sosInterval) clearInterval(sosInterval);
 
-            // 🔥 Auto Stop Tracking & Save
+            // 🔥 เช็คว่ามีการ Tracking อยู่ไหม
             if (trackingStarted) {
-                toggleTracking(false); // Stops track
-                
-                // 🔥 AUTO SAVE SOS DATA
+                // 1. สั่งหยุด GPS และ Timer เอง "แบบเงียบๆ" (เพื่อหลบ Alert ใน toggleTracking เดิม)
+                if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                stopTimer();
+                trackingStarted = false; // ปรับสถานะเป็นหยุดแล้ว
+
+                // 2. บันทึกข้อมูล
                 if (linePoints.length > 0) {
                     showLoading(true, "SAVING SOS RECORD...");
                     var lastPt = linePoints[linePoints.length - 1];
                     var payload = { 
                         lat: lastPt[0], lon: lastPt[1], 
-                        level: "จุดอันตราย", // Auto-set level
+                        level: "จุดอันตราย", 
                         desc: "🚨 SOS EMERGENCY TRACK (Auto-Saved)", 
                         type: "track", 
                         pathData: JSON.stringify(linePoints), 
                         locationName: "Emergency Location", searchLocation: "SOS Route", province: "-", 
                         reporterName: currentUser ? currentUser.username : "Guest" 
                     };
+                    
                     callApi('saveData', payload).then(res => { 
                         showLoading(false); 
-                        if(res.status === 'SUCCESS') { alert(getTxt('alertSave')); } 
-                        else if(res.status === 'OFFLINE_SAVED') { alert(getTxt('alertOffline')); } 
-                        resetForm(); switchTab('feed'); 
+                        // เมื่อบันทึกเสร็จ สั่ง Reset (มันจะไม่ Alert แล้ว เพราะเราเคลียร์ watchId เป็น null ไปแล้วข้างบน)
+                        resetForm(); 
+                        switchTab('feed'); 
                     });
+                } else {
+                    resetForm();
                 }
+            } else {
+                // ถ้าไม่ได้ Track อยู่ ก็ปิดหน้าต่างปกติ
+                resetForm();
             }
         }
 
