@@ -64,12 +64,12 @@
 
         .map-legend-control { 
             background: rgba(15, 23, 42, 0.95); padding: 10px; border-radius: 8px; font-size: 11px; border: 1px solid rgba(255,255,255,0.1); 
-            color: #cbd5e1; box-shadow: 0 5px 15px rgba(0,0,0,0.5) !important; max-height: 300px; overflow-y: auto; width: 130px; transition: 0.3s;
+            color: #cbd5e1; box-shadow: 0 60px 15px rgba(0,0,0,0.5) !important; max-height: 300px; overflow-y: auto; width: 130px; transition: 0.3s;
         }
 
         /* --- Custom Floating Tools (Buttons) --- */
         .map-tools-container {
-            position: absolute; top: 20px; right: 15px; z-index: 1000;
+            position: absolute; top: 75px; right: 15px; z-index: 1000;
             display: flex; flex-direction: column; gap: 12px; align-items: flex-end;
         }
         .tool-btn {
@@ -104,7 +104,7 @@
 
         /* Minimal Nav Stop Button */
         .nav-stop-container {
-            position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%);
+            position: absolute; bottom: 120px; left: 50%; transform: translateX(-50%);
             z-index: 1000; display: none; animation: slideUp 0.3s ease;
         }
         .btn-stop-nav {
@@ -183,7 +183,7 @@
         .feed-card { background: #1e293b; border-left: 4px solid #444; margin-bottom: 12px; padding: 15px; border-radius: 12px; cursor: pointer; border: 1px solid rgba(255,255,255,0.05); position: relative; }
         .gps-float-wrapper { position: absolute; z-index: 900; cursor: pointer; display: flex; flex-direction: column; align-items: center; }
         .gps-float-btn { width: 45px; height: 45px; background: #1e293b; border: 2px solid var(--primary-color); border-radius: 50%; color: white; font-size: 20px; box-shadow: 0 4px 10px rgba(0,0,0,0.3); display: flex; align-items: center; justify-content: center; }
-        .gps-pos-dashboard { bottom: 80px; right: 15px; } .gps-pos-report { top: 80px; right: 10px; bottom: auto; }
+        .gps-pos-dashboard { bottom: auto; top: 20px; right: 15px; } .gps-pos-report { top: 80px; right: 10px; bottom: auto; }
         .track-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; } .track-start { background: #10b981; } .track-stop { background: #ef4444; }
         
         #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(11, 17, 32, 0.95); display: none; align-items: center; justify-content: center; z-index: 10000; flex-direction: column; color: white; backdrop-filter: blur(5px); }
