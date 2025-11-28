@@ -595,26 +595,30 @@
             }
         }
 
-        function startInternalNav(destLat, destLon) {
+function startInternalNav(destLat, destLon) {
             if (!navigator.geolocation) { alert("GPS not supported"); return; }
+            
+            // 1. เคลียร์ค่าเก่าและเตรียมหน้าจอ
             stopNavigation();
             showLoading(true, "STARTING NAV...");
             switchTab('dashboard');
             currentDestLatLng = L.latLng(destLat, destLon);
 
+            // 2. หาพิกัดเริ่มต้น
             navigator.geolocation.getCurrentPosition(function(pos) {
                 var userLat = pos.coords.latitude;
                 var userLon = pos.coords.longitude;
                 var startLatLng = L.latLng(userLat, userLon);
 
                 try {
+                    // 3. สร้าง Routing Machine Control
                     routingControl = L.Routing.control({
                         waypoints: [startLatLng, currentDestLatLng],
                         routeWhileDragging: false,
                         showAlternatives: false,
                         lineOptions: { styles: [{color: '#2ed573', opacity: 0.8, weight: 6}] },
                         createMarker: function(i, wp, nWps) {
-                            if (i === 0) return null; 
+                            if (i === 0) return null; // ไม่แสดงหมุดจุดเริ่ม (เพราะเรามีจุดสีฟ้าแล้ว)
                             return L.marker(wp.latLng, {
                                 icon: L.icon({
                                     iconUrl: 'https://cdn-icons-png.flaticon.com/512/1483/1483336.png',
@@ -626,6 +630,7 @@
                         fitSelectedRoutes: true
                     })
                     .on('routesfound', function(e) {
+                        // เมื่อคำนวณเส้นทางสำเร็จ ให้แสดงข้อมูลใน Panel
                         var routes = e.routes;
                         var summary = routes[0].summary;
                         var instructions = routes[0].instructions;
@@ -658,27 +663,48 @@
                     })
                     .addTo(mapDashboard);
 
+                    // แสดง UI นำทาง
                     document.getElementById('nav-stop-ui').style.display = 'block';
                     document.getElementById('btn-tool-route').style.display = 'flex'; 
                     showLoading(false);
 
+                    // 4. เริ่มติดตามพิกัดผู้ใช้แบบ Real-time
                     navWatchId = navigator.geolocation.watchPosition(function(p) {
                         var lat = p.coords.latitude;
                         var lng = p.coords.longitude;
                         currentNavPos = { lat: lat, lng: lng };
                         var newStart = L.latLng(lat, lng);
 
+                        // อัปเดตจุดสีฟ้า (User Marker) เสมอ ไม่ว่ามีเน็ตหรือไม่
                         if(myLocationMarker) mapDashboard.removeLayer(myLocationMarker);
                         myLocationMarker = L.circleMarker(newStart, { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 0.9 }).addTo(mapDashboard);
 
+                        // --- ส่วนสำคัญ: เช็คเน็ตก่อนอัปเดตเส้นทาง ---
                         if (routingControl) {
-                            var wps = routingControl.getWaypoints();
-                            routingControl.setWaypoints([newStart, wps[1].latLng]);
+                            if (navigator.onLine) {
+                                // ✅ มีเน็ต: สั่งให้ Routing Machine คำนวณเส้นใหม่จากจุดปัจจุบัน
+                                var wps = routingControl.getWaypoints();
+                                routingControl.setWaypoints([newStart, wps[1].latLng]);
+                            } else {
+                                // ❌ ไม่มีเน็ต: ไม่ต้องทำอะไรกับ routingControl (ปล่อยเส้นเดิมค้างไว้)
+                                console.log("Offline: Keeping static route");
+                            }
+                        }
+                        // ----------------------------------------
+
+                        // คำนวณระยะห่างเส้นตรง (Direct Distance) เพื่ออัปเดตตัวเลข
+                        var dist = newStart.distanceTo(currentDestLatLng);
+                        var distEl = document.getElementById('dist-remain');
+                        
+                        if (navigator.onLine) {
+                            distEl.innerText = "(" + Math.round(dist) + " m)";
+                            distEl.style.color = "#cbd5e1";
+                        } else {
+                            distEl.innerText = "(" + Math.round(dist) + " m) [OFFLINE]";
+                            distEl.style.color = "#ff4757"; // สีแดงเตือน
                         }
 
-                        var dist = newStart.distanceTo(currentDestLatLng);
-                        document.getElementById('dist-remain').innerText = "(" + Math.round(dist) + " m)";
-
+                        // เช็คว่าถึงหรือยัง (ระยะน้อยกว่า 20 เมตร)
                         if (dist < 20) {
                             stopNavigation();
                             alert("🎉 คุณเดินทางถึงที่หมายแล้ว! (You have arrived!)");
