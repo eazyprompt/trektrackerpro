@@ -96,7 +96,7 @@
 
         .mode-switch { display: flex; margin-bottom: 15px; background: rgba(0,0,0,0.3); border-radius: 12px; padding: 4px; border: 1px solid rgba(255,255,255,0.05); }
         .mode-btn { flex: 1; padding: 8px; border: none; background: transparent; color: #94a3b8; border-radius: 8px; font-weight: 500; font-size: 13px; } .mode-btn.active { background: #1e293b; color: white; }
-        input.app-input, select, textarea { width: 100%; padding: 12px; background: #1e293b; border: 1px solid rgba(255,255,255,0.05); color: white; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; outline: none; font-family: 'Kanit'; font-size: 14px; }
+        input.app-input, select, textarea { width: 100%; padding: 12px; background: #1e293b; border: 1px solid rgba(255,255,255,0.05); color: white; border-radius: 10px; margin-bottom: 10px; box-sizing: border-box; outline: none; font-family: 'Kanit'; font-size: 14px; transition: 0.3s; }
         input.app-input:focus, select:focus, textarea:focus { border-color: var(--primary-color); }
         
         /* ERROR STATE STYLE */
@@ -125,6 +125,28 @@
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 15000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
         .text-btn { background: transparent; border: none; color: #94a3b8; margin-top: 15px; cursor: pointer; font-size: 14px; }
         .text-btn:hover { color: white; text-decoration: underline; }
+
+        /* 🔥 WEATHER WIDGET - FLOATING ON MAP */
+        #weather-widget {
+            position: absolute;
+            top: 140px; /* Position below locate button or offline button */
+            right: 10px;
+            z-index: 900;
+            display: flex; align-items: center; gap: 8px;
+            background: rgba(15, 23, 42, 0.85);
+            backdrop-filter: blur(5px);
+            border: 1px solid rgba(255,255,255,0.2);
+            padding: 8px 12px;
+            border-radius: 30px;
+            color: #cbd5e1;
+            font-size: 12px;
+            animation: fadeIn 0.5s ease;
+            cursor: pointer;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+        #weather-temp { font-weight: bold; color: #2ed573; font-size: 14px; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
+
     </style>
 </head>
 <body>
@@ -138,23 +160,16 @@
         <div class="glass-card" style="max-width: 300px; padding-bottom: 30px;">
             <h2 style="margin-top:0; color:white; font-size:22px;">Settings</h2>
             <div style="width:100%; margin-bottom:20px; border-bottom:1px solid rgba(255,255,255,0.1);"></div>
-            
             <button class="auth-btn" onclick="downloadOfflineMap()" style="background:#1e293b; border:1px solid rgba(255,255,255,0.2); margin-top:0;">
                 📥 <span id="btn-dl-map">Offline Map</span>
             </button>
-
             <button class="auth-btn" onclick="clearAppCache()" style="background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255,255,255,0.2); margin-top: 15px;">
                 🗑️ <span id="btn-clear-cache">Clear Cache</span>
             </button>
-            
             <button class="auth-btn" onclick="doLogout()" style="background: rgba(255, 71, 87, 0.15); border: 1px solid #ff4757; color: #ff4757; margin-top: 15px;">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
-                    <line x1="12" y1="2" x2="12" y2="12"></line>
-                </svg>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path><line x1="12" y1="2" x2="12" y2="12"></line></svg>
                 <span id="btn-logout-modal">Logout</span>
             </button>
-
             <button class="text-btn" onclick="closeSettings()" id="btn-close">Close</button>
         </div>
     </div>
@@ -201,6 +216,12 @@
                 <img class="lang-flag" id="lang-img-report" src="https://flagcdn.com/24x18/gb.png" style="width:16px;">
                 <span id="lang-text-report">EN</span>
             </div>
+            
+            <div id="weather-widget" style="display:none;" onclick="locateUser()">
+                <span id="weather-icon">☀️</span>
+                <span id="weather-temp">--°C</span>
+            </div>
+
             <div class="gps-float-wrapper gps-pos-report" onclick="locateUser()">
                 <button class="gps-float-btn">🎯</button>
             </div>
@@ -283,7 +304,6 @@
         const API_URL = "https://script.google.com/macros/s/AKfycbyhPaLIUWsjxw3JRbDCoArpn5QHjH5nQLZJCLUlNV9tCpjmj8ljF9L8VgPuMIiJK4Lq/exec"; 
         // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
 
-        // Register Service Worker
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
                 navigator.serviceWorker.register('./sw.js').then(reg => console.log('SW Registered')).catch(err => console.log('SW Failed', err));
@@ -364,7 +384,6 @@
             }
         }
         
-        // 🔥 Function to Clear Cache
         function clearAppCache() {
             if(confirm(getTxt('confirmClearCache'))) {
                 showLoading(true, "CLEANING...");
@@ -383,11 +402,41 @@
             }
         }
 
+        // 🔥 WEATHER FUNCTION
+        function fetchWeather(lat, lon) {
+            const url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`;
+            fetch(url)
+                .then(response => response.json())
+                .then(data => {
+                    const temp = data.current_weather.temperature;
+                    const code = data.current_weather.weathercode;
+                    const widget = document.getElementById('weather-widget');
+                    const iconEl = document.getElementById('weather-icon');
+                    const tempEl = document.getElementById('weather-temp');
+
+                    // Map codes to emojis & text
+                    let icon = "☁️";
+
+                    if (code === 0) { icon = "☀️"; }
+                    else if (code <= 3) { icon = "⛅"; }
+                    else if (code <= 48) { icon = "🌫️"; }
+                    else if (code <= 67) { icon = "🌧️"; }
+                    else if (code <= 77) { icon = "❄️"; }
+                    else if (code <= 82) { icon = "🌦️"; }
+                    else if (code <= 99) { icon = "⛈️"; }
+
+                    iconEl.innerText = icon;
+                    tempEl.innerText = `${temp}°C`;
+                    
+                    widget.style.display = "flex";
+                })
+                .catch(err => console.log("Weather Error:", err));
+        }
+
         const langData = {
             th: {
                 flag: "https://flagcdn.com/24x18/th.png", loginBtn: "เริ่มใช้งาน <span>➜</span>", regLink: "สร้างบัญชีใหม่", regTitle: "สมัครสมาชิก", regBtn: "ยืนยันการสมัคร", loginLink: "กลับไปหน้าเข้าสู่ระบบ", loginSub: "ระบบนำทางความแม่นยำสูง", regSub: "เริ่มต้นการเดินทางของคุณ", phUser: "ชื่อผู้ใช้", phPass: "รหัสผ่าน", phName: "ชื่อที่แสดง", 
                 logout: "ออกระบบ", tabSetting: "ตั้งค่า", btnClose: "ปิด", btnDownloadMap: "โหลดแผนที่ออฟไลน์",
-                // 🔥 Added Clear Cache Text
                 btnClearCache: "ล้างแคช (Clear Cache)", confirmClearCache: "ต้องการล้างแคชทั้งหมดหรือไม่? (แผนที่ออฟไลน์จะหายไป)",
                 modePoint: "📍 ปักจุด", modeLine: "〰️ ลากเส้น", modeTrack: "🏃 ติดตาม", startBtn: "▶️ เริ่ม", stopBtn: "⏹️ หยุด", coordHint: "แตะแผนที่เพื่อระบุ ↗", descPlace: "รายละเอียด...", saveBtn: "บันทึกข้อมูล", saveRoute: "บันทึกเส้นทาง", feedHeader: "บันทึกการเดินทาง", feedSearch: "ค้นหา...", tab1: "ระบุ", tab2: "บันทึก", tab3: "แผนที่", confirmLogout: "ต้องการออกจากระบบ?", loading: "กำลังเชื่อมต่อ...", processing: "กำลังบันทึก...", alertPin: "⚠️ ระบุตำแหน่งก่อนครับ", alertName: "📝 ตั้งชื่อเส้นทาง:", alertSave: "✅ บันทึกแล้ว!", alertLoginFail: "❌ ชื่อผู้ใช้ผิด", alertStopTrack: "กรุณากดปุ่มหยุดก่อน", txtLogin: "กำลังเข้าสู่ระบบ...", alertOffline: "⚠️ ไม่มีอินเทอร์เน็ต! บันทึกลงเครื่องแล้ว จะส่งให้อัตโนมัติเมื่อมีเน็ต", selectHint: "-- กรุณาเลือกประเภท --", alertSelect: "⚠️ กรุณาเลือกประเภทสถานที่ก่อนบันทึกครับ",
                 options: [ {val: "ร้านอาหาร", txt: "🍴 ร้านอาหาร"}, {val: "คาเฟ่", txt: "☕ คาเฟ่"}, {val: "ที่พัก", txt: "🏨 ที่พัก"}, {val: "สถานที่ท่องเที่ยว", txt: "🗿 ท่องเที่ยว"}, {val: "จุดชมวิว", txt: "📸 จุดชมวิว"}, {val: "จุดกางเต็นท์", txt: "⛺ กางเต็นท์"}, {val: "แหล่งน้ำ", txt: "💧 แหล่งน้ำ"}, {val: "ที่จอดรถ", txt: "🅿️ ที่จอดรถ"}, {val: "ทางเดินเท้า", txt: "🥾 เดินเท้า"}, {val: "จุดอันตราย", txt: "⚠️ อันตราย"}, {val: "อื่นๆ", txt: "🚩 อื่นๆ"} ],
@@ -396,7 +445,6 @@
             en: {
                 flag: "https://flagcdn.com/24x18/gb.png", loginBtn: "START APP <span>➜</span>", regLink: "Create an Account", regTitle: "Join the Trek", regBtn: "SIGN UP", loginLink: "Back to Login", loginSub: "Navigate Nature with Confidence", regSub: "Start your journey today", phUser: "Username", phPass: "Password", phName: "Display Name", 
                 logout: "Logout", tabSetting: "Setting", btnClose: "Close", btnDownloadMap: "Download Offline Map",
-                // 🔥 Added Clear Cache Text
                 btnClearCache: "Clear Cache", confirmClearCache: "Clear all cache? (Offline maps will be removed)",
                 modePoint: "📍 Pin", modeLine: "〰️ Route", modeTrack: "🏃 Track", startBtn: "▶️ START", stopBtn: "⏹️ STOP", coordHint: "Tap map to pin ↗", descPlace: "Description...", saveBtn: "SAVE DATA", saveRoute: "SAVE ROUTE", feedHeader: "Journey Log", feedSearch: "Search...", tab1: "Pin", tab2: "Log", tab3: "Map", confirmLogout: "Confirm Logout?", loading: "CONNECTING...", processing: "SAVING...", alertPin: "⚠️ Mark location first", alertName: "📝 Route Name:", alertSave: "✅ Saved!", alertLoginFail: "❌ Invalid User/Pass", alertStopTrack: "Please press STOP first.", txtLogin: "LOGGING IN...", alertOffline: "⚠️ No Internet! Saved to device. Will sync automatically when online.", selectHint: "-- Please Select Type --", alertSelect: "⚠️ Please select a type first",
                 options: [ {val: "ร้านอาหาร", txt: "🍴 Restaurant"}, {val: "คาเฟ่", txt: "☕ Cafe"}, {val: "ที่พัก", txt: "🏨 Hotel"}, {val: "สถานที่ท่องเที่ยว", txt: "🗿 Attraction"}, {val: "จุดชมวิว", txt: "📸 Viewpoint"}, {val: "จุดกางเต็นท์", txt: "⛺ Campsite"}, {val: "แหล่งน้ำ", txt: "💧 Water Source"}, {val: "ที่จอดรถ", txt: "🅿️ Parking"}, {val: "ทางเดินเท้า", txt: "🥾 Hiking Trail"}, {val: "จุดอันตราย", txt: "⚠️ Danger"}, {val: "อื่นๆ", txt: "🚩 Other"} ],
@@ -427,12 +475,10 @@
             document.getElementById('reg-pass').placeholder = t.phPass; 
             document.getElementById('reg-name').placeholder = t.phName;
             
-            // Update Settings Modal Text
             const btnLogout = document.getElementById('btn-logout-modal'); if(btnLogout) btnLogout.innerText = t.logout;
             const btnDlMap = document.getElementById('btn-dl-map'); if(btnDlMap) btnDlMap.innerText = t.btnDownloadMap;
             const btnClose = document.getElementById('btn-close'); if(btnClose) btnClose.innerText = t.btnClose;
             const tabSetting = document.getElementById('tab-setting-text'); if(tabSetting) tabSetting.innerText = t.tabSetting;
-            // 🔥 New text
             const btnClearCache = document.getElementById('btn-clear-cache'); if(btnClearCache) btnClearCache.innerText = t.btnClearCache;
 
             document.getElementById('btn-mode-point').innerText = t.modePoint; document.getElementById('btn-mode-line').innerText = t.modeLine; document.getElementById('btn-mode-track').innerText = t.modeTrack;
@@ -484,11 +530,27 @@
                      navigator.geolocation.getCurrentPosition(function(pos) { var lat = pos.coords.latitude; var lng = pos.coords.longitude; linePoints = [[lat, lng]]; mapReport.setView([lat, lng], 16); toggleTracking(true); alert(getTxt('gpsFound') + Math.round(pos.coords.accuracy) + "m)"); }, function(err) { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
                 } else { mapReport.setView(linePoints[linePoints.length - 1], 16); } return;
             }
-            if (!navigator.geolocation) { alert("GPS not supported"); return; } document.getElementById('coord-text').innerText = getTxt('gpsWait'); navigator.geolocation.getCurrentPosition(function(pos) { var lat = pos.coords.latitude; var lng = pos.coords.longitude; var acc = pos.coords.accuracy; mapReport.setView([lat, lng], 16); updateUserLocation(lat, lng, acc); getAddress(lat, lng); alert(getTxt('gpsFound') + Math.round(acc) + "m)"); }, function(err) { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
+            if (!navigator.geolocation) { alert("GPS not supported"); return; } document.getElementById('coord-text').innerText = getTxt('gpsWait'); navigator.geolocation.getCurrentPosition(function(pos) { var lat = pos.coords.latitude; var lng = pos.coords.longitude; var acc = pos.coords.accuracy; mapReport.setView([lat, lng], 16); updateUserLocation(lat, lng, acc); getAddress(lat, lng); alert(getTxt('gpsFound') + Math.round(acc) + "m)"); 
+            // 🔥 CALL WEATHER API
+            fetchWeather(lat, lng);
+            }, function(err) { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
         }
         function locateDashboardUser() { if (!navigator.geolocation) { alert("GPS not supported"); return; } navigator.geolocation.getCurrentPosition(function(pos) { var lat = pos.coords.latitude; var lng = pos.coords.longitude; mapDashboard.setView([lat, lng], 16); if(myLocationMarker) mapDashboard.removeLayer(myLocationMarker); myLocationMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 0.9 }).addTo(mapDashboard).bindPopup("You").openPopup(); }, function(err) { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true }); }
         function getAddress(lat, lng) { var url = "https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=" + lat + "&lon=" + lng + "&accept-language=th"; fetch(url).then(r=>r.json()).then(d=>{ var display = (d.address.village || d.address.suburb || d.address.city || d.display_name).substring(0,40); currentAddress = display; currentProvince = d.address.state || ""; document.getElementById('coord-text').innerText = "📍 " + currentAddress; }).catch(e=>{ currentAddress = lat.toFixed(5)+","+lng.toFixed(5); document.getElementById('coord-text').innerText = "📍 " + currentAddress; }); }
-        function updateUserLocation(lat, lng, accuracy) { if (currentMode === 'point') { if (tempMarker) mapReport.removeLayer(tempMarker); if (accCircle) mapReport.removeLayer(accCircle); tempMarker = L.marker([lat, lng]).addTo(mapReport); linePoints = [[lat, lng]]; getAddress(lat, lng); if (accuracy > 0) accCircle = L.circle([lat, lng], { radius: accuracy, color: '#00d4ff', fillColor: '#00d4ff', fillOpacity: 0.1, weight: 1 }).addTo(mapReport); } else if (currentMode === 'line') { linePoints.push([lat, lng]); if (tempLine) mapReport.removeLayer(tempLine); tempLine = L.polyline(linePoints, {color: '#00d4ff', weight: 4, dashArray: '10, 10'}).addTo(mapReport); document.getElementById('coord-text').innerText = "〰️ " + linePoints.length + " pts"; } }
+        
+        function updateUserLocation(lat, lng, accuracy) { 
+            if (currentMode === 'point') { 
+                if (tempMarker) mapReport.removeLayer(tempMarker); if (accCircle) mapReport.removeLayer(accCircle); 
+                tempMarker = L.marker([lat, lng]).addTo(mapReport); linePoints = [[lat, lng]]; 
+                getAddress(lat, lng); 
+                // 🔥 CALL WEATHER API ON TAP
+                fetchWeather(lat, lng);
+                
+                if (accuracy > 0) accCircle = L.circle([lat, lng], { radius: accuracy, color: '#00d4ff', fillColor: '#00d4ff', fillOpacity: 0.1, weight: 1 }).addTo(mapReport); 
+            } else if (currentMode === 'line') { 
+                linePoints.push([lat, lng]); if (tempLine) mapReport.removeLayer(tempLine); tempLine = L.polyline(linePoints, {color: '#00d4ff', weight: 4, dashArray: '10, 10'}).addTo(mapReport); document.getElementById('coord-text').innerText = "〰️ " + linePoints.length + " pts"; 
+            } 
+        }
         
         function checkAuth() { var u = sessionStorage.getItem('trekUser'); var n = sessionStorage.getItem('trekName'); if(u && n) { currentUser = { username: u, name: n }; showApp(); } else { showLogin(); } }
         function showLogin() { document.getElementById('page-login').style.display = 'flex'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'none'; }
@@ -496,11 +558,100 @@
         function showApp() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'block'; document.getElementById('display-username').innerText = "👤 " + currentUser.name; setTimeout(function(){ initMaps(); loadAllData(); if(mapReport) mapReport.invalidateSize(); }, 200); }
         function doLogin() { var u=document.getElementById('login-user').value; var p=document.getElementById('login-pass').value; if(!u||!p) return; showLoading(true, getTxt('loading')); callApi('loginUser', { username: u, password: p }).then(res => { showLoading(false); if(res.status==='SUCCESS'){ sessionStorage.setItem('trekUser', u); sessionStorage.setItem('trekName', res.name); currentUser={username:u, name:res.name}; showApp(); } else { alert(getTxt('alertLoginFail')); } }); }
         function doRegister() { var n=document.getElementById('reg-name').value; var u=document.getElementById('reg-user').value; var p=document.getElementById('reg-pass').value; if(!n||!u||!p) return; showLoading(true, getTxt('loading')); callApi('registerUser', { username: u, password: p, name: n }).then(res => { showLoading(false); if(res.status==='SUCCESS'){ alert("✅ OK"); showLogin(); } else { alert("Error: " + res.status); } }); }
-        function doLogout() { if(confirm(getTxt('confirmLogout'))) { closeSettings(); sessionStorage.clear(); currentUser=null; location.reload(); } }
-        function showLoading(s, t) { var o=document.getElementById('loading-overlay'); if(s){ document.getElementById('loading-text').innerText=t||"Loading..."; o.style.display='flex'; } else { o.style.display='none'; } }
-        function submitReport() { if (watchId !== null && trackingStarted) { alert(getTxt('alertStopTrack')); return; } if(linePoints.length===0){alert(getTxt('alertPin'));return;} var s = (currentMode==='line' || currentMode==='track') ? (prompt(getTxt('alertName'))||"") : currentAddress; if((currentMode==='line' || currentMode==='track') && s==="") return; showLoading(true, getTxt('processing')); var l=document.getElementById('level').value; var d=document.getElementById('desc').value; var lat=linePoints[0][0]; var lon=linePoints[0][1]; var p=(currentMode==='line' || currentMode==='track')?JSON.stringify(linePoints):""; var r=currentUser?currentUser.username:"Guest"; if (currentMode === 'point' && (l === "" || document.getElementById('level').selectedIndex === 0)) { alert(getTxt('alertSelect')); switchTab('report'); setTimeout(() => { document.getElementById('level').focus(); document.getElementById('level').classList.add('input-error'); }, 300); setTimeout(()=>document.getElementById('level').classList.remove('input-error'), 2000); showLoading(false); return; } if(currentMode !== 'point') l = "ทางเดินเท้า"; var payload = { lat: lat, lon: lon, level: l, desc: d, type: currentMode, pathData: p, locationName: currentAddress, searchLocation: s, province: currentProvince, reporterName: r }; callApi('saveData', payload).then(res => { showLoading(false); if(res.status === 'SUCCESS') { alert(getTxt('alertSave')); resetForm(); loadAllData(); switchTab('feed'); } else if(res.status === 'OFFLINE_SAVED') { alert(getTxt('alertOffline')); resetForm(); switchTab('feed'); } else { alert("Save Error: " + res.message); } }).catch(e => { showLoading(false); alert("Network Error: " + e.message); }); }
         
-        function resetForm() { if (watchId !== null) toggleTracking(false); if(tempMarker) mapReport.removeLayer(tempMarker); if(accCircle) mapReport.removeLayer(accCircle); if(tempLine) mapReport.removeLayer(tempLine); tempMarker=null; tempLine=null; accCircle=null; linePoints=[]; document.getElementById('desc').value=""; const levelSelect = document.getElementById('level'); if (currentMode === 'line' || currentMode === 'track') { levelSelect.value = "ทางเดินเท้า"; levelSelect.style.display = 'none'; } else { levelSelect.selectedIndex = 0; levelSelect.style.display = 'block'; } document.getElementById('coord-text').innerText=getTxt('coordHint'); const trekForm = document.getElementById('trekForm'); const trackingUI = document.getElementById('tracking-ui'); if (currentMode === 'track') { trekForm.style.display = 'none'; trackingUI.style.display = 'block'; document.getElementById('btn-track-start').style.display = 'block'; document.getElementById('btn-track-stop').style.display = 'none'; } else { trekForm.style.display = 'block'; trackingUI.style.display = 'none'; } stopTimer(); }
+        // 🔥 Updated: doLogout closes the settings modal first
+        function doLogout() { 
+            if(confirm(getTxt('confirmLogout'))) { 
+                closeSettings();
+                sessionStorage.clear(); 
+                currentUser=null; 
+                location.reload(); 
+            } 
+        }
+
+        function showLoading(s, t) { var o=document.getElementById('loading-overlay'); if(s){ document.getElementById('loading-text').innerText=t||"Loading..."; o.style.display='flex'; } else { o.style.display='none'; } }
+        
+        // 🔥 FIXED: Strict Validation for Dropdown (Index Check)
+        function submitReport() { 
+            if (watchId !== null && trackingStarted) { alert(getTxt('alertStopTrack')); return; }
+            if(linePoints.length===0){alert(getTxt('alertPin'));return;} 
+            
+            var selObj = document.getElementById('level');
+            var l = selObj.value;
+
+            // 🔥 FORCE CHECK: If mode is 'point' AND selectedIndex is 0 (Please Select) -> BLOCK
+            if (currentMode === 'point' && selObj.selectedIndex === 0) { 
+                alert(getTxt('alertSelect')); 
+                
+                // Force redirect to Report page
+                switchTab('report');
+                
+                // Highlight Error
+                setTimeout(() => {
+                    selObj.focus(); 
+                    selObj.classList.add('input-error');
+                }, 300);
+                
+                setTimeout(() => selObj.classList.remove('input-error'), 2000);
+                return; // Stop here!
+            }
+
+            var s = (currentMode==='line' || currentMode==='track') ? (prompt(getTxt('alertName'))||"") : currentAddress; 
+            if((currentMode==='line' || currentMode==='track') && s==="") return; 
+            
+            showLoading(true, getTxt('processing')); 
+            var d=document.getElementById('desc').value; var lat=linePoints[0][0]; var lon=linePoints[0][1]; var p=(currentMode==='line' || currentMode==='track')?JSON.stringify(linePoints):""; var r=currentUser?currentUser.username:"Guest"; 
+            
+            // Auto-fill type for non-point modes
+            if(currentMode !== 'point') l = "ทางเดินเท้า";
+
+            var payload = { lat: lat, lon: lon, level: l, desc: d, type: currentMode, pathData: p, locationName: currentAddress, searchLocation: s, province: currentProvince, reporterName: r }; 
+            
+            callApi('saveData', payload).then(res => { 
+                showLoading(false); 
+                if(res.status === 'SUCCESS') { 
+                    alert(getTxt('alertSave')); resetForm(); loadAllData(); switchTab('feed'); 
+                } else if(res.status === 'OFFLINE_SAVED') { 
+                    alert(getTxt('alertOffline')); resetForm(); switchTab('feed'); 
+                } else { 
+                    alert("Save Error: " + res.message); 
+                } 
+            }).catch(e => {
+                showLoading(false);
+                alert("Network Error: " + e.message);
+            }); 
+        }
+        
+        function resetForm() { 
+            if (watchId !== null) toggleTracking(false); 
+            if(tempMarker) mapReport.removeLayer(tempMarker); if(accCircle) mapReport.removeLayer(accCircle); if(tempLine) mapReport.removeLayer(tempLine); 
+            tempMarker=null; tempLine=null; accCircle=null; linePoints=[]; 
+            document.getElementById('desc').value=""; 
+            
+            const levelSelect = document.getElementById('level');
+            
+            // 🔥 Reset Logic with Visibility Check
+            if (currentMode === 'line' || currentMode === 'track') {
+                levelSelect.value = "ทางเดินเท้า";
+                levelSelect.style.display = 'none';
+            } else {
+                levelSelect.selectedIndex = 0; // Reset to index 0 (Please Select)
+                levelSelect.style.display = 'block';
+            }
+
+            document.getElementById('coord-text').innerText=getTxt('coordHint'); 
+            const trekForm = document.getElementById('trekForm'); const trackingUI = document.getElementById('tracking-ui'); 
+            if (currentMode === 'track') { trekForm.style.display = 'none'; trackingUI.style.display = 'block'; document.getElementById('btn-track-start').style.display = 'block'; document.getElementById('btn-track-stop').style.display = 'none'; } 
+            else { trekForm.style.display = 'block'; trackingUI.style.display = 'none'; } 
+            stopTimer(); 
+        }
+
+        function loadAllData(callback) { callApi('getData').then(d => { allFeedData = d || []; renderFeed(allFeedData); if(callback) callback(); }); }
+        function filterFeed() { var t = document.getElementById('feedSearch').value.toLowerCase(); renderFeed(allFeedData.filter(r => (r[5]+r[6]+r[3]).toLowerCase().indexOf(t) > -1)); }
+        function renderFeed(data) { if(mapDashboard) { mapDashboard.eachLayer(l => { if (!l._url && !l._icon) try { mapDashboard.removeLayer(l); } catch(e){} }); L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(mapDashboard); } if (!data || data.length === 0) { document.getElementById('feed-list').innerHTML = "<p style='text-align:center; color:#666; margin-top:20px;'>No Data</p>"; return; } var html = ""; var rev = data.slice().reverse(); var myUser = currentUser ? currentUser.username : ""; for (var i = 0; i < rev.length; i++) { try { var r = rev[i]; var rawDate = new Date(r[0]); var dateStr = rawDate.toLocaleDateString(curLang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', year: '2-digit' }); var timeStr = rawDate.toLocaleTimeString(curLang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }); var color = getLevelColor(r[3]); var isLine = r[4].indexOf("[PATH_DATA]") !== -1; var cleanDesc = r[6] || r[5]; var displayLevel = getLevelDisplay(r[3]); var deleteBtn = (r[8] === myUser) ? `<span class="delete-btn" onclick="confirmDelete('${r[0]}'); event.stopPropagation();">🗑️</span>` : ""; var cardDesc = isLine ? r[4].split(" || ")[1] : r[4]; html += `<div class="feed-card" style="border-left-color:${color}" onclick="focusOnMap(${r[1]},${r[2]})"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;"><span style="font-weight:bold; font-size:16px; color:${color}">${displayLevel}</span><div><span style="font-size:11px; color:#94a3b8; background:#0f172a; padding:2px 8px; border-radius:10px; border:1px solid rgba(255,255,255,0.1);">👤 ${r[8]||'Guest'}</span>${deleteBtn}</div></div><div style="color:white; font-size:14px; font-weight:bold; margin-bottom: 2px;">📍 ${ cleanDesc }</div><div style="color:#94a3b8; font-size:12px; margin-bottom:6px; display:flex; gap: 10px;"><span>📅 ${dateStr}</span><span>⏰ ${timeStr}</span></div><div style="color:#cbd5e1; font-size:13px; border-top:1px solid rgba(255,255,255,0.05); margin-top:4px; padding-top:6px;">📝 ${cardDesc||'-'}</div></div>`; drawOnMap(mapDashboard, r[1], r[2], r[3], r[4], true); } catch(e){} } document.getElementById('feed-list').innerHTML = html; }
+        function getLevelDisplay(val) { const m = langData[curLang].options.find(o => o.val === val); return m ? m.txt.split(' ')[1] + ' ' + (m.txt.split(' ')[2]||"") : val; }
+        function getLevelColor(l) { if(l.indexOf("อันตราย")!=-1) return "#ff4757"; if(l.indexOf("น้ำ")!=-1) return "#3b82f6"; if(l.indexOf("กางเต็นท์")!=-1) return "#2ed573"; if(l.indexOf("ชมวิว")!=-1 || l.indexOf("ท่องเที่ยว")!=-1) return "#eccc68"; if(l.indexOf("ร้านอาหาร")!=-1 || l.indexOf("อาหาร")!=-1 || l.indexOf("คาเฟ่")!=-1) return "#ff6b81"; if(l.indexOf("ที่พัก")!=-1) return "#a55eea"; if(l.indexOf("จอดรถ")!=-1) return "#a4b0be"; return "#747d8c"; }
+        function drawOnMap(m, lat, lon, l, d, isD) { var c = getLevelColor(l); if(d.indexOf("[PATH_DATA]")!=-1) { try { L.polyline(JSON.parse(d.split(" || ")[0].replace("[PATH_DATA]:","")), {color: c, weight: isD?3:5}).bindPopup(l).addTo(m); } catch(e){} } else { L.circleMarker([lat, lon], {color: c, fillColor: c, fillOpacity: 0.9, radius: 6}).bindPopup(l).addTo(m); } }
         function setMode(m) { if (watchId !== null) toggleTracking(false); currentMode=m; document.querySelectorAll('.mode-btn').forEach(b=>b.classList.remove('active')); const levelSelect = document.getElementById('level'); const trekForm = document.getElementById('trekForm'); const trackingUI = document.getElementById('tracking-ui'); if (m === 'point' || m === 'line') { document.getElementById('btn-mode-'+m).classList.add('active'); trackingUI.style.display = 'none'; trekForm.style.display = 'block'; if (m === 'point') { levelSelect.disabled = false; } else { levelSelect.value = "ทางเดินเท้า"; levelSelect.disabled = true; } } else if (m === 'track') { document.getElementById('btn-mode-track').classList.add('active'); levelSelect.value = "ทางเดินเท้า"; levelSelect.disabled = true; trackingUI.style.display = 'block'; trekForm.style.display = 'none'; document.getElementById('btn-track-start').style.display = 'block'; document.getElementById('btn-track-stop').style.display = 'none'; document.getElementById('timer-display-start').innerText = "00:00:00"; } resetForm(); if(m==='line' || m==='track') document.querySelector('.submit-btn').innerText=getTxt('saveRoute'); else document.querySelector('.submit-btn').innerText=getTxt('saveBtn'); document.getElementById('undoBtn').style.display=(m!=='point')?'block':'none'; }
         function undoLastPoint() { if((currentMode==='line' || currentMode==='track') && linePoints.length>0) { linePoints.pop(); if(tempLine) mapReport.removeLayer(tempLine); if(linePoints.length>0) tempLine=L.polyline(linePoints, {color:'#10b981', weight:4}).addTo(mapReport); } }
         function switchTab(t) { document.querySelectorAll('.page-content').forEach(p=>p.classList.remove('active')); document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); document.getElementById('page-'+t).classList.add('active'); var idx=(t==='feed')?1:(t==='dashboard')?2:0; document.querySelectorAll('.tab-btn')[idx].classList.add('active'); const trekForm = document.getElementById('trekForm'); const trackingUI = document.getElementById('tracking-ui'); if(t === 'report') { if (currentMode === 'track') { trackingUI.style.display = 'block'; trekForm.style.display = trackingStarted ? 'none' : 'block'; document.getElementById('btn-track-start').style.display = trackingStarted ? 'none' : 'block'; document.getElementById('btn-track-stop').style.display = trackingStarted ? 'block' : 'none'; } else { trackingUI.style.display = 'none'; trekForm.style.display = 'block'; } } else { trackingUI.style.display = 'none'; } if(t === 'feed') { var btn = document.getElementById('btn-refresh'); btn.classList.add('spin-anim'); loadAllData(function(){ setTimeout(() => { btn.classList.remove('spin-anim'); }, 500); }); } setTimeout(()=>{ if(t!=='feed'){ mapReport.invalidateSize(); mapDashboard.invalidateSize(); } }, 200); }
