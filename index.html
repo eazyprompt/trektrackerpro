@@ -466,7 +466,8 @@
             }
         }
 
-        function switchTab(t) { 
+function switchTab(t) { 
+            // เช็คว่ากำลังนำทางอยู่ไหม
             if (t !== 'dashboard' && navWatchId !== null) {
                 alert(curLang === 'th' 
                     ? "⚠️ คุณกำลังเปิดระบบนำทางอยู่!\nกรุณากดปุ่ม '❌ Stop Nav' บนหน้าแผนที่ก่อนเปลี่ยนหน้าครับ" 
@@ -474,14 +475,17 @@
                 return; 
             }
 
+            // เปลี่ยนหน้า UI
             document.querySelectorAll('.page-content').forEach(p=>p.classList.remove('active')); 
             document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); 
             document.getElementById('page-'+t).classList.add('active'); 
             var idx=(t==='feed')?1:(t==='dashboard')?2:0; 
             document.querySelectorAll('.tab-btn')[idx].classList.add('active'); 
+            
             const trekForm = document.getElementById('trekForm'); 
             const trackingUI = document.getElementById('tracking-ui'); 
             
+            // จัดการหน้า Report (Pin)
             if(t === 'report') { 
                 if (currentMode === 'track') { 
                     trackingUI.style.display = 'block'; 
@@ -495,13 +499,46 @@
                 trackingUI.style.display = 'none'; 
             }
 
+            // ✅✅✅ ส่วนที่แก้ไข Logic การแสดงผล ✅✅✅
             if(t === 'dashboard') {
-                // Ensure layer group is added
-                if(mapDashboard && feedLayerGroup && !mapDashboard.hasLayer(feedLayerGroup)){
-                    feedLayerGroup.addTo(mapDashboard);
+                if(feedLayerGroup) {
+                    feedLayerGroup.clearLayers(); // ล้างหน้าจอ
+                    
+                    allFeedData.forEach(r => {
+                        // เช็คว่าเป็น SOS หรือไม่
+                        var isSOS = (r[5] === "SOS Route" || r[6] === "SOS Route");
+                        var rawDesc = r[4]; // ข้อมูลดิบ (มีทั้ง Path Data และข้อความ)
+
+                        if (isSOS) {
+                            // 🔴 กรณีเป็น SOS: เราต้องการแสดงแค่ "จุด"
+                            // เทคนิค: เราจะดึงเฉพาะ "ข้อความ" ออกมา (ตัดส่วน [PATH_DATA]... ทิ้งไป)
+                            // เมื่อส่งไปให้ drawOnMap มันจะไม่เจอคำว่า [PATH_DATA] มันเลยจะวาดเป็นจุดให้เอง
+                            
+                            var cleanTextOnly = "";
+                            if (rawDesc.indexOf(" || ") !== -1) {
+                                cleanTextOnly = rawDesc.split(" || ")[1]; // เอาข้อความหลัง ||
+                            } else {
+                                // กรณีไม่มี || แต่เป็น Path ให้ใส่ข้อความ default
+                                cleanTextOnly = "SOS Signal"; 
+                            }
+
+                            // ส่ง cleanTextOnly ไปแทน rawDesc -> ผลลัพธ์คือได้ "จุด"
+                            drawOnMap(feedLayerGroup, r[1], r[2], r[3], cleanTextOnly, true);
+
+                        } else {
+                            // 🟢 กรณีอื่น (เช่น Hiking Trail): ส่ง rawDesc ไปเต็มๆ 
+                            // ถ้ามีข้อมูลเส้น มันก็จะวาดเป็น "เส้น" ให้ตามปกติ
+                            drawOnMap(feedLayerGroup, r[1], r[2], r[3], rawDesc, true);
+                        }
+                    });
+
+                    if(mapDashboard && !mapDashboard.hasLayer(feedLayerGroup)){
+                        feedLayerGroup.addTo(mapDashboard);
+                    }
                 }
             }
             
+            // จัดการหน้า Feed
             if(t === 'feed') { 
                 var btn = document.getElementById('btn-refresh'); 
                 btn.classList.add('spin-anim'); 
@@ -1148,18 +1185,89 @@ function startInternalNav(destLat, destLon) {
         function loadAllData(callback) { callApi('getData').then(d => { allFeedData = d || []; renderFeed(allFeedData); if(callback) callback(); }); }
         function filterFeed() { var t = document.getElementById('feedSearch').value.toLowerCase(); renderFeed(allFeedData.filter(r => (r[5]+r[6]+r[3]).toLowerCase().indexOf(t) > -1)); }
         
-        function focusOnCard(timestamp) {
-            switchTab('dashboard');
-            
-            const record = allFeedData.find(r => r[0] === timestamp);
-            if (!record) return;
+function focusOnCard(timestamp) {
+            // 1. แจ้งเตือน User
+            showLoading(true, "OPENING MAP...");
 
-            // ✅ Clear ONLY pins in Layer Group (Keep Route)
-            if(feedLayerGroup) feedLayerGroup.clearLayers();
-
-            drawOnMap(feedLayerGroup, record[1], record[2], record[3], record[4], false);
+            // 2. สลับหน้าจอ (Switch Tab Manual)
+            document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
             
-            setTimeout(() => mapDashboard.setView([record[1], record[2]], 16), 300);
+            document.getElementById('page-dashboard').classList.add('active');
+            document.querySelectorAll('.tab-btn')[2].classList.add('active'); 
+
+            // 3. เริ่มทำงาน (หน่วง 100ms เพื่อให้หน้าจอแสดงผล Tab เสร็จก่อน)
+            setTimeout(() => { 
+                if(!mapDashboard) { showLoading(false); return; }
+
+                // ⚠️ สำคัญ: บอก Map ว่าขนาดจอเปลี่ยนไปแล้ว (แก้ Map สีเทา/การแสดงผลเพี้ยน)
+                mapDashboard.invalidateSize(); 
+
+                // 4. ล้างข้อมูลเก่าออกให้หมด (ในจังหวะที่ Map พร้อมแล้ว)
+                if(feedLayerGroup) {
+                    feedLayerGroup.clearLayers();
+                    // ตรวจสอบว่า LayerGroup หลุดจาก Map ไหม ถ้าหลุดให้ใส่คืน
+                    if(!mapDashboard.hasLayer(feedLayerGroup)) {
+                        feedLayerGroup.addTo(mapDashboard);
+                    }
+                }
+
+                // 5. ดึงข้อมูล
+                const record = allFeedData.find(r => r[0] === timestamp);
+                if (!record) { showLoading(false); return; }
+
+                var rawData = record[4];
+                var hasPathTag = rawData && rawData.indexOf("[PATH_DATA]") !== -1;
+
+                if (hasPathTag) {
+                    try {
+                        var jsonMatch = rawData.match(/\[\[.*\]\]/);
+                        if (jsonMatch) {
+                            var points = JSON.parse(jsonMatch[0]); 
+
+                            if (points.length > 0) {
+                                var color = getLevelColor(record[3]);
+                                
+                                // ✅✅✅ กลับมาใช้ SVG (ค่าเริ่มต้น) เพื่อความเสถียร ไม่หายวับ ✅✅✅
+                                // (ลบ renderer: myRenderer ออก)
+                                
+                                var polyline = L.polyline(points, {
+                                    color: color, 
+                                    weight: 5, 
+                                    opacity: 0.8,
+                                    lineJoin: 'round'
+                                }).addTo(feedLayerGroup);
+
+                                var btnTxt = getTxt('navInApp');
+                                var displayTitle = getLevelDisplay(record[3]);
+                                var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="startInternalNav(${record[1]}, ${record[2]})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
+                                polyline.bindPopup(popupContent);
+
+                                // Zoom ไปหาเส้น
+                                mapDashboard.fitBounds(polyline.getBounds(), { 
+                                    padding: [50, 50],
+                                    animate: false // ปิด Animation เพื่อความเร็วและกันกระตุก
+                                });
+                            }
+                        }
+                    } catch(e) {
+                        console.error("Path Error:", e);
+                        fallbackDrawPoint(record);
+                    }
+                } else {
+                    fallbackDrawPoint(record);
+                }
+
+                // 6. ปิด Loading
+                setTimeout(() => showLoading(false), 300);
+
+            }, 100); 
+        }
+
+        function fallbackDrawPoint(record) {
+             drawOnMap(feedLayerGroup, record[1], record[2], record[3], record[4], false);
+             // ใช้ setView แบบไม่มี Animation เพื่อความชัวร์
+             mapDashboard.setView([record[1], record[2]], 16, { animate: false });
         }
 
         function renderFeed(data) { 
