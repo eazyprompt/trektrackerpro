@@ -467,7 +467,9 @@
         }
 
 function switchTab(t) { 
-            // เช็คว่ากำลังนำทางอยู่ไหม
+            // -----------------------------------------------------------
+            // 1. Safety Guard: เช็คว่ากำลังนำทางอยู่ไหม
+            // -----------------------------------------------------------
             if (t !== 'dashboard' && navWatchId !== null) {
                 alert(curLang === 'th' 
                     ? "⚠️ คุณกำลังเปิดระบบนำทางอยู่!\nกรุณากดปุ่ม '❌ Stop Nav' บนหน้าแผนที่ก่อนเปลี่ยนหน้าครับ" 
@@ -475,17 +477,19 @@ function switchTab(t) {
                 return; 
             }
 
-            // เปลี่ยนหน้า UI
+            // -----------------------------------------------------------
+            // 2. UI Switching: เปลี่ยนคลาส CSS ให้หน้าจอแสดงผล
+            // -----------------------------------------------------------
             document.querySelectorAll('.page-content').forEach(p=>p.classList.remove('active')); 
             document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); 
             document.getElementById('page-'+t).classList.add('active'); 
             var idx=(t==='feed')?1:(t==='dashboard')?2:0; 
             document.querySelectorAll('.tab-btn')[idx].classList.add('active'); 
             
+            // จัดการ UI ของหน้า Pin (Report)
             const trekForm = document.getElementById('trekForm'); 
             const trackingUI = document.getElementById('tracking-ui'); 
             
-            // จัดการหน้า Report (Pin)
             if(t === 'report') { 
                 if (currentMode === 'track') { 
                     trackingUI.style.display = 'block'; 
@@ -499,55 +503,76 @@ function switchTab(t) {
                 trackingUI.style.display = 'none'; 
             }
 
-            // ✅✅✅ ส่วนที่แก้ไข Logic การแสดงผล ✅✅✅
+            // -----------------------------------------------------------
+            // 3. Dashboard Logic: กรองข้อมูลที่จะแสดงบนแผนที่รวม
+            // -----------------------------------------------------------
             if(t === 'dashboard') {
                 if(feedLayerGroup) {
-                    feedLayerGroup.clearLayers(); // ล้างหน้าจอ
-                    
+                    feedLayerGroup.clearLayers(); // ล้างหน้าจอเก่า
+
                     allFeedData.forEach(r => {
-                        // เช็คว่าเป็น SOS หรือไม่
                         var isSOS = (r[5] === "SOS Route" || r[6] === "SOS Route");
-                        var rawDesc = r[4]; // ข้อมูลดิบ (มีทั้ง Path Data และข้อความ)
+                        var rawDesc = r[4];
 
                         if (isSOS) {
-                            // 🔴 กรณีเป็น SOS: เราต้องการแสดงแค่ "จุด"
-                            // เทคนิค: เราจะดึงเฉพาะ "ข้อความ" ออกมา (ตัดส่วน [PATH_DATA]... ทิ้งไป)
-                            // เมื่อส่งไปให้ drawOnMap มันจะไม่เจอคำว่า [PATH_DATA] มันเลยจะวาดเป็นจุดให้เอง
-                            
-                            var cleanTextOnly = "";
-                            if (rawDesc.indexOf(" || ") !== -1) {
-                                cleanTextOnly = rawDesc.split(" || ")[1]; // เอาข้อความหลัง ||
-                            } else {
-                                // กรณีไม่มี || แต่เป็น Path ให้ใส่ข้อความ default
-                                cleanTextOnly = "SOS Signal"; 
-                            }
-
-                            // ส่ง cleanTextOnly ไปแทน rawDesc -> ผลลัพธ์คือได้ "จุด"
+                            // 🔴 กรณีเป็น SOS: ให้แสดงเป็น "จุด" (ตัดข้อมูล Path ทิ้ง)
+                            // เพื่อไม่ให้เส้น SOS สีแดงพาดเต็มหน้าจอ Dashboard
+                            var cleanTextOnly = (rawDesc.indexOf(" || ") !== -1) ? rawDesc.split(" || ")[1] : "SOS Signal";
                             drawOnMap(feedLayerGroup, r[1], r[2], r[3], cleanTextOnly, true);
-
                         } else {
-                            // 🟢 กรณีอื่น (เช่น Hiking Trail): ส่ง rawDesc ไปเต็มๆ 
-                            // ถ้ามีข้อมูลเส้น มันก็จะวาดเป็น "เส้น" ให้ตามปกติ
+                            // 🟢 กรณีอื่น (เส้นทางเดินป่า): ให้ส่งข้อมูลดิบไปเลย 
+                            // ระบบจะวาดเป็น "เส้น" ให้เห็นตามปกติ
                             drawOnMap(feedLayerGroup, r[1], r[2], r[3], rawDesc, true);
                         }
                     });
 
+                    // ใส่ Layer กลับเข้า Map
                     if(mapDashboard && !mapDashboard.hasLayer(feedLayerGroup)){
                         feedLayerGroup.addTo(mapDashboard);
                     }
                 }
             }
             
-            // จัดการหน้า Feed
+            // -----------------------------------------------------------
+            // 4. Feed Logic (Smart Loading): ป้องกันการกดรัว
+            // -----------------------------------------------------------
             if(t === 'feed') { 
+                showLoading(true, "LOADING LOGS...");
                 var btn = document.getElementById('btn-refresh'); 
                 btn.classList.add('spin-anim'); 
-                loadAllData(function(){ setTimeout(() => { btn.classList.remove('spin-anim'); }, 500); }); 
+                
+                // เริ่มจับเวลา
+                var startTime = Date.now();
+
+                // เรียกโหลดข้อมูล
+                loadAllData(function(){ 
+                    // คำนวณเวลาที่ผ่านไป
+                    var endTime = Date.now();
+                    var elapsedTime = endTime - startTime;
+                    var minWait = 1500; // ⏳ บังคับรออย่างน้อย 1.5 วินาที
+
+                    // คำนวณเวลาที่ต้องรอเพิ่ม
+                    var remainingTime = minWait - elapsedTime;
+                    if (remainingTime < 0) remainingTime = 0; // ถ้าโหลดนานกว่า 1.5 วิ ก็ไม่ต้องรอเพิ่ม
+
+                    // ปิด Loading ตามเวลาที่คำนวณได้
+                    setTimeout(() => { 
+                        btn.classList.remove('spin-anim'); 
+                        showLoading(false); 
+                    }, remainingTime); 
+                }); 
             } 
             
-            setTimeout(()=>{ if(t!=='feed'){ mapReport.invalidateSize(); mapDashboard.invalidateSize(); } }, 200); 
+            // -----------------------------------------------------------
+            // 5. Map Refresh: แก้บั๊กแผนที่สีเทา/ขนาดผิด
+            // -----------------------------------------------------------
+            setTimeout(()=>{ 
+                if(t!=='feed'){ 
+                    if(mapReport) mapReport.invalidateSize(); 
+                    if(mapDashboard) mapDashboard.invalidateSize(); 
+                } 
+            }, 200); 
         }
-
         function saveEmailSettings() {
             if(!currentUser) return;
             var email = document.getElementById('sos-email').value;
@@ -1185,83 +1210,138 @@ function startInternalNav(destLat, destLon) {
         function loadAllData(callback) { callApi('getData').then(d => { allFeedData = d || []; renderFeed(allFeedData); if(callback) callback(); }); }
         function filterFeed() { var t = document.getElementById('feedSearch').value.toLowerCase(); renderFeed(allFeedData.filter(r => (r[5]+r[6]+r[3]).toLowerCase().indexOf(t) > -1)); }
         
-function focusOnCard(timestamp) {
-            // 1. แจ้งเตือน User
+var currentFocusTimer = null;
+
+        function focusOnCard(timestamp) {
+            // 1. สั่งหยุดงานเก่าทันที (Debounce)
+            if (currentFocusTimer) { clearTimeout(currentFocusTimer); currentFocusTimer = null; }
+
             showLoading(true, "OPENING MAP...");
 
-            // 2. สลับหน้าจอ (Switch Tab Manual)
+            // 2. สลับหน้าจอทันที
             document.querySelectorAll('.page-content').forEach(p => p.classList.remove('active'));
             document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            
             document.getElementById('page-dashboard').classList.add('active');
             document.querySelectorAll('.tab-btn')[2].classList.add('active'); 
 
-            // 3. เริ่มทำงาน (หน่วง 100ms เพื่อให้หน้าจอแสดงผล Tab เสร็จก่อน)
-            setTimeout(() => { 
-                if(!mapDashboard) { showLoading(false); return; }
+            // 3. ปลุกแผนที่ให้ตื่น (ครั้งที่ 1)
+            if (mapDashboard) mapDashboard.invalidateSize();
 
-                // ⚠️ สำคัญ: บอก Map ว่าขนาดจอเปลี่ยนไปแล้ว (แก้ Map สีเทา/การแสดงผลเพี้ยน)
+            // 4. เริ่มนับถอยหลังวาด (เพิ่มเวลาเป็น 250ms เพื่อรอ Map ตื่นเต็มที่)
+            currentFocusTimer = setTimeout(() => {
+                executeMapDraw(timestamp);
+            }, 250); // ⏳ เพิ่มจาก 100 เป็น 250 เพื่อความชัวร์ในกรณีเปิดครั้งแรก
+        }
+
+        function executeMapDraw(timestamp) {
+            if(!mapDashboard) { showLoading(false); return; }
+            
+            // A. ปลุกแผนที่อีกรอบ (ครั้งที่ 2 - สำคัญมาก)
+            mapDashboard.invalidateSize();
+
+            // B. เตรียม Layer
+            if(feedLayerGroup) {
+                feedLayerGroup.clearLayers();
+                if(!mapDashboard.hasLayer(feedLayerGroup)) feedLayerGroup.addTo(mapDashboard);
+            }
+
+            const record = allFeedData.find(r => r[0] === timestamp);
+            if (!record) { showLoading(false); return; }
+
+            var rawData = record[4];
+            var hasPathTag = rawData && rawData.indexOf("[PATH_DATA]") !== -1;
+
+            if (hasPathTag) {
+                try {
+                    var jsonMatch = rawData.match(/\[\[.*\]\]/);
+                    if (jsonMatch) {
+                        var points = JSON.parse(jsonMatch[0]);
+                        var color = getLevelColor(record[3]);
+                        
+                        // C. วาดเส้น (SVG)
+                        var polyline = L.polyline(points, {
+                            color: color, weight: 6, opacity: 0.9, lineJoin: 'round',
+                            renderer: L.svg() 
+                        }).addTo(feedLayerGroup);
+
+                        var btnTxt = getTxt('navInApp');
+                        var displayTitle = getLevelDisplay(record[3]);
+                        var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="startInternalNav(${record[1]}, ${record[2]})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
+                        polyline.bindPopup(popupContent);
+
+                        // D. สั่ง Zoom (ปิด Animation เพื่อความแม่นยำ)
+                        mapDashboard.fitBounds(polyline.getBounds(), { padding: [50, 50], animate: false });
+
+                        // ✅ E. The Watchdog (ผู้คุมสอบ): ตรวจสอบซ้ำรอบสุดท้าย
+                        // สั่งวาดซ้ำอีกทีหลังจากผ่านไปอีก 0.3 วินาที (กันเส้นหาย)
+                        setTimeout(() => {
+                            if(mapDashboard) {
+                                mapDashboard.invalidateSize(); // เช็คจออีกรอบ
+                                polyline.redraw();             // บังคับวาดเส้นทับลงไปใหม่
+                                showLoading(false);            // เสร็จสิ้น
+                            }
+                        }, 300);
+
+                    } else { throw new Error("No Path JSON"); }
+                } catch(e) {
+                    console.error(e);
+                    fallbackDrawPoint(record);
+                    showLoading(false);
+                }
+            } else {
+                fallbackDrawPoint(record);
+                setTimeout(() => showLoading(false), 300);
+            }
+        }
+
+        function fallbackDrawPoint(record) {
+             drawOnMap(feedLayerGroup, record[1], record[2], record[3], record[4], false);
+             mapDashboard.setView([record[1], record[2]], 16, { animate: false });
+        }
+function drawSecurePath(points, color, popupContent) {
+            if (!mapDashboard || !feedLayerGroup) return;
+
+            // ขั้นที่ 1: เตรียมพื้นที่
+            mapDashboard.invalidateSize(); 
+            feedLayerGroup.clearLayers();
+            if (!mapDashboard.hasLayer(feedLayerGroup)) {
+                feedLayerGroup.addTo(mapDashboard);
+            }
+
+            // ขั้นที่ 2: สร้างเส้น (ใช้ SVG renderer เพื่อความเสถียรสูงสุด)
+            var polyline = L.polyline(points, {
+                color: color,
+                weight: 6,
+                opacity: 0.9,
+                lineJoin: 'round',
+                renderer: L.svg() // บังคับใช้ SVG (สำคัญมากสำหรับการสลับ Tab)
+            });
+
+            polyline.bindPopup(popupContent);
+            polyline.addTo(feedLayerGroup);
+
+            // ขั้นที่ 3: สั่ง Zoom ครั้งแรก
+            mapDashboard.fitBounds(polyline.getBounds(), { padding: [50, 50], animate: false });
+
+            // ขั้นที่ 4: ✅ The Watchdog (ตรวจสอบความปลอดภัย)
+            // เราจะเช็คซ้ำอีกครั้งใน 300ms (หลังจาก Animation ทุกอย่างจบ)
+            setTimeout(() => {
+                // A. บอก Map ว่าขนาดจอเปลี่ยนแน่นอน (กันเหนียว)
                 mapDashboard.invalidateSize(); 
 
-                // 4. ล้างข้อมูลเก่าออกให้หมด (ในจังหวะที่ Map พร้อมแล้ว)
-                if(feedLayerGroup) {
-                    feedLayerGroup.clearLayers();
-                    // ตรวจสอบว่า LayerGroup หลุดจาก Map ไหม ถ้าหลุดให้ใส่คืน
-                    if(!mapDashboard.hasLayer(feedLayerGroup)) {
-                        feedLayerGroup.addTo(mapDashboard);
-                    }
-                }
+                // B. บังคับวาดเส้นใหม่ (Redraw)
+                polyline.redraw(); 
 
-                // 5. ดึงข้อมูล
-                const record = allFeedData.find(r => r[0] === timestamp);
-                if (!record) { showLoading(false); return; }
+                // C. บังคับ Zoom อีกรอบ (เผื่อรอบแรก Map ยังคำนวณขนาดจอผิด)
+                mapDashboard.fitBounds(polyline.getBounds(), { 
+                    padding: [50, 50], 
+                    animate: false 
+                });
 
-                var rawData = record[4];
-                var hasPathTag = rawData && rawData.indexOf("[PATH_DATA]") !== -1;
+                // D. ปิด Loading (งานเสร็จสมบูรณ์ 100%)
+                showLoading(false);
 
-                if (hasPathTag) {
-                    try {
-                        var jsonMatch = rawData.match(/\[\[.*\]\]/);
-                        if (jsonMatch) {
-                            var points = JSON.parse(jsonMatch[0]); 
-
-                            if (points.length > 0) {
-                                var color = getLevelColor(record[3]);
-                                
-                                // ✅✅✅ กลับมาใช้ SVG (ค่าเริ่มต้น) เพื่อความเสถียร ไม่หายวับ ✅✅✅
-                                // (ลบ renderer: myRenderer ออก)
-                                
-                                var polyline = L.polyline(points, {
-                                    color: color, 
-                                    weight: 5, 
-                                    opacity: 0.8,
-                                    lineJoin: 'round'
-                                }).addTo(feedLayerGroup);
-
-                                var btnTxt = getTxt('navInApp');
-                                var displayTitle = getLevelDisplay(record[3]);
-                                var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="startInternalNav(${record[1]}, ${record[2]})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
-                                polyline.bindPopup(popupContent);
-
-                                // Zoom ไปหาเส้น
-                                mapDashboard.fitBounds(polyline.getBounds(), { 
-                                    padding: [50, 50],
-                                    animate: false // ปิด Animation เพื่อความเร็วและกันกระตุก
-                                });
-                            }
-                        }
-                    } catch(e) {
-                        console.error("Path Error:", e);
-                        fallbackDrawPoint(record);
-                    }
-                } else {
-                    fallbackDrawPoint(record);
-                }
-
-                // 6. ปิด Loading
-                setTimeout(() => showLoading(false), 300);
-
-            }, 100); 
+            }, 300);
         }
 
         function fallbackDrawPoint(record) {
@@ -1270,42 +1350,82 @@ function focusOnCard(timestamp) {
              mapDashboard.setView([record[1], record[2]], 16, { animate: false });
         }
 
-        function renderFeed(data) { 
-            // ✅ Use Layer Group
+ function renderFeed(data) { 
+            // 1. ล้าง Layer เก่าบนแผนที่ก่อน (เพื่อไม่ให้ซ้อนกัน)
             if(feedLayerGroup) feedLayerGroup.clearLayers();
 
-            if (!data || data.length === 0) { document.getElementById('feed-list').innerHTML = "<p style='text-align:center; color:#666; margin-top:20px;'>No Data</p>"; return; } 
+            // 2. ถ้าไม่มีข้อมูล ให้แสดงข้อความว่าง
+            if (!data || data.length === 0) { 
+                document.getElementById('feed-list').innerHTML = "<p style='text-align:center; color:#666; margin-top:20px;'>No Data</p>"; 
+                return; 
+            } 
             
             var html = ""; 
+            
+            // 3. กลับด้านข้อมูล (เอาล่าสุดขึ้นก่อน)
             var rev = data.slice().reverse(); 
+            
+            // ✅✅✅ ไฮไลท์: ตัดให้เหลือแค่ 100 รายการล่าสุด ✅✅✅
+            if(rev.length > 100) {
+                rev = rev.slice(0, 100);
+            }
+            
             var myUser = currentUser ? currentUser.username : ""; 
             
+            // 4. วนลูปสร้าง Card
             for (var i = 0; i < rev.length; i++) { 
                 try { 
                     var r = rev[i]; 
+                    
+                    // แปลงเวลา
                     var rawDate = new Date(r[0]); 
                     var dateStr = rawDate.toLocaleDateString(curLang === 'th' ? 'th-TH' : 'en-US', { day: 'numeric', month: 'short', year: '2-digit' }); 
                     var timeStr = rawDate.toLocaleTimeString(curLang === 'th' ? 'th-TH' : 'en-US', { hour: '2-digit', minute: '2-digit' }); 
+                    
+                    // เตรียมตัวแปรสีและประเภท
                     var color = getLevelColor(r[3]); 
                     var isLineOrTrack = r[4].indexOf("[PATH_DATA]") !== -1; 
-                    var cleanDesc = r[6] || r[5]; 
-                    var displayLevel = getLevelDisplay(r[3]); 
+                    var cleanDesc = r[6] || r[5]; // ชื่อสถานที่
+                    var displayLevel = getLevelDisplay(r[3]); // ประเภท (ร้านอาหาร, จุดชมวิว ฯลฯ)
+                    
+                    // ปุ่มลบ (แสดงเฉพาะเจ้าของโพสต์)
                     var deleteBtn = (r[8] === myUser) ? `<span class="delete-btn" onclick="confirmDelete('${r[0]}'); event.stopPropagation();">🗑️</span>` : ""; 
+                    
+                    // คำอธิบาย (ตัดส่วน Path Data ออกถ้ามี)
                     var cardDesc = isLineOrTrack ? r[4].split(" || ")[1] : r[4]; 
                     
-                    var navBtn = `<button onclick="startInternalNav(${r[1]}, ${r[2]})" style="background:transparent; border:1px solid #2ed573; color:#2ed573; border-radius:20px; padding:2px 8px; font-size:11px; cursor:pointer; margin-left:5px;">🗺️ NAV</button>`;
+                    // ปุ่ม Nav ใน Card (เพิ่ม event.stopPropagation เพื่อไม่ให้กดแล้วเด้งไปหน้า Map)
+                    var navBtn = `<button onclick="startInternalNav(${r[1]}, ${r[2]}); event.stopPropagation();" style="background:transparent; border:1px solid #2ed573; color:#2ed573; border-radius:20px; padding:2px 8px; font-size:11px; cursor:pointer; margin-left:5px;">🗺️ NAV</button>`;
                     
-                    html += `<div class="feed-card" style="border-left-color:${color}" onclick="focusOnCard('${r[0]}')"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;"><span style="font-weight:bold; font-size:16px; color:${color}">${displayLevel}</span><div><span style="font-size:11px; color:#94a3b8; background:#0f172a; padding:2px 8px; border-radius:10px; border:1px solid rgba(255,255,255,0.1);">👤 ${r[8]||'Guest'}</span>${deleteBtn}</div></div><div style="color:white; font-size:14px; font-weight:bold; margin-bottom: 2px;">📍 ${ cleanDesc }</div><div style="color:#94a3b8; font-size:12px; margin-bottom:6px; display:flex; gap: 10px; align-items:center;"><span>📅 ${dateStr} ${timeStr}</span>${navBtn}</div><div style="color:#cbd5e1; font-size:13px; border-top:1px solid rgba(255,255,255,0.05); margin-top:4px; padding-top:6px;">📝 ${cardDesc||'-'}</div></div>`; 
+                    // สร้าง HTML Card
+                    html += `<div class="feed-card" style="border-left-color:${color}" onclick="focusOnCard('${r[0]}')">
+                                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+                                    <span style="font-weight:bold; font-size:16px; color:${color}">${displayLevel}</span>
+                                    <div>
+                                        <span style="font-size:11px; color:#94a3b8; background:#0f172a; padding:2px 8px; border-radius:10px; border:1px solid rgba(255,255,255,0.1);">👤 ${r[8]||'Guest'}</span>
+                                        ${deleteBtn}
+                                    </div>
+                                </div>
+                                <div style="color:white; font-size:14px; font-weight:bold; margin-bottom: 2px;">📍 ${ cleanDesc }</div>
+                                <div style="color:#94a3b8; font-size:12px; margin-bottom:6px; display:flex; gap: 10px; align-items:center;">
+                                    <span>📅 ${dateStr} ${timeStr}</span>${navBtn}
+                                </div>
+                                <div style="color:#cbd5e1; font-size:13px; border-top:1px solid rgba(255,255,255,0.05); margin-top:4px; padding-top:6px;">📝 ${cardDesc||'-'}</div>
+                            </div>`; 
                     
+                    // 5. วาดจุดลง Map (เฉพาะที่ไม่ใช่เส้นทาง) เพื่อเป็นการ Preload
+                    // (หมายเหตุ: switchTab('dashboard') จะทำการวาดซ้ำใหม่อีกรอบเพื่อความชัวร์อยู่แล้ว)
                     if (!isLineOrTrack) {
-                        // ✅ Add to Layer Group
                         drawOnMap(feedLayerGroup, r[1], r[2], r[3], r[4], true); 
                     }
-                } catch(e){} 
+                } catch(e) {
+                    console.log("Render Error for item", i, e);
+                } 
             } 
+            
+            // อัปเดต HTML หน้าจอ
             document.getElementById('feed-list').innerHTML = html; 
         }
-
         function getLevelDisplay(val) { const m = langData[curLang].options.find(o => o.val === val); return m ? m.txt.split(' ')[1] + ' ' + (m.txt.split(' ')[2]||"") : val; }
         function getLevelColor(l) { if(l.indexOf("อันตราย")!=-1) return "#ff4757"; if(l.indexOf("น้ำ")!=-1) return "#3b82f6"; if(l.indexOf("กางเต็นท์")!=-1) return "#2ed573"; if(l.indexOf("ชมวิว")!=-1 || l.indexOf("ท่องเที่ยว")!=-1) return "#eccc68"; if(l.indexOf("ร้านอาหาร")!=-1 || l.indexOf("อาหาร")!=-1 || l.indexOf("คาเฟ่")!=-1) return "#ff6b81"; if(l.indexOf("ที่พัก")!=-1) return "#a55eea"; if(l.indexOf("จอดรถ")!=-1) return "#a4b0be"; return "#747d8c"; }
         
