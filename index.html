@@ -1035,24 +1035,69 @@ function startInternalNav(destLat, destLon) {
         function manualRefresh() { var icon = document.getElementById('refresh-icon'); icon.classList.add('spin-anim'); showLoading(true, "REFRESHING..."); loadAllData(function(){ setTimeout(function(){ icon.classList.remove('spin-anim'); showLoading(false); }, 500); }); }
         function confirmDelete(timestampStr) { if(confirm(getTxt('delConfirm'))) { var myUser = currentUser ? currentUser.username : ""; showLoading(true, "DELETING..."); callApi('deleteItem', { timestamp: timestampStr, username: myUser }).then(res => { showLoading(false); if(res.status === 'SUCCESS') { alert(getTxt('delSuccess')); loadAllData(); } else { alert(getTxt('delFail')); } }); } }
 
-        function initMaps() { 
+function initMaps() { 
             if(mapReport) return; 
+            
             try { 
-                var osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'; var osmAttr = '© OSM'; var mapOpts = { maxZoom: 19, attribution: osmAttr }; 
+                var osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'; 
+                var osmAttr = '© OSM'; 
+                var mapOpts = { maxZoom: 19, attribution: osmAttr }; 
+                
                 mapReport = L.map('map-report', { zoomControl: false, minZoom: 2, maxZoom: 19 }).setView([13.7563, 100.5018], 10); 
                 L.tileLayer(osmUrl, mapOpts).addTo(mapReport); 
                 
                 mapDashboard = L.map('map-dashboard', { zoomControl: false, minZoom: 2, maxZoom: 19 }).setView([13.7563, 100.5018], 10); 
                 L.tileLayer(osmUrl, mapOpts).addTo(mapDashboard); 
                 
-                // ✅ Init Feed Layer Group
                 feedLayerGroup = L.layerGroup().addTo(mapDashboard);
 
-                var geocoder = L.Control.geocoder({ defaultMarkGeocode: false, geocoder: L.Control.Geocoder.nominatim(), placeholder: 'Search...', collapsed: false }).on('markgeocode', function(e) { var center = e.geocode.center; mapReport.setView(center, 16); updateUserLocation(center.lat, center.lng, 0); }).addTo(mapReport); 
-                mapReport.on('click', function(e) { updateUserLocation(e.latlng.lat, e.latlng.lng, 0); }); 
+                // ---------------------------------------------------------
+                // 🛠️ กลับมาใช้ Nominatim (มาตรฐาน) แต่บังคับให้แสดงชื่อเต็ม
+                // ---------------------------------------------------------
+                var geocoder = L.Control.geocoder({ 
+                    defaultMarkGeocode: false, 
+                    
+                    // ใช้ Nominatim (ตัวมาตรฐานของ OSM)
+                    geocoder: L.Control.Geocoder.nominatim({
+                        geocodingQueryParams: {
+                            'accept-language': 'th,en', // ขอภาษาไทยถ้ามี
+                            'addressdetails': 1,        // ขอที่อยู่ละเอียด
+                            'limit': 10                 // ขอ 10 รายการ
+                        }
+                    }),
+                    
+                    placeholder: 'ค้นหาสถานที่...', 
+                    collapsed: false, 
+                    position: 'topright'
+                })
+                .on('markgeocode', function(e) { 
+                    var center = e.geocode.center; 
+                    mapReport.setView(center, 16); 
+                    updateUserLocation(center.lat, center.lng, 0); 
+                    
+                    // แสดง Popup ยืนยันตำแหน่ง
+                    var fullName = e.geocode.name || e.geocode.html;
+                    L.popup()
+                        .setLatLng(center)
+                        .setContent(`<div style="text-align:center; font-size:12px; width:200px;">
+                                        <b>📍 ตรวจสอบตำแหน่ง</b><br>
+                                        <div style="margin-top:5px; color:#555;">${fullName}</div>
+                                     </div>`)
+                        .openOn(mapReport);
+                })
+                .addTo(mapReport); 
+                // ---------------------------------------------------------
 
-                setTimeout(function(){ mapReport.invalidateSize(); }, 500); 
-            } catch (e) { console.error(e); } 
+                mapReport.on('click', function(e) { 
+                    updateUserLocation(e.latlng.lat, e.latlng.lng, 0); 
+                }); 
+
+                setTimeout(function(){ 
+                    if(mapReport) mapReport.invalidateSize(); 
+                    if(mapDashboard) mapDashboard.invalidateSize();
+                }, 500); 
+                
+            } catch (e) { console.error("Map Init Error:", e); } 
         }
         
         function locateUser() { 
