@@ -200,7 +200,7 @@
         #weather-temp { font-weight: bold; color: #2ed573; font-size: 14px; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
         
-        #emergency-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 20000; display: none; flex-direction: column; align-items: center; justify-content: center; background-color: black; }
+        #emergency-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 99999; display: none; flex-direction: column; align-items: center; justify-content: center; background-color: black; }
         .sos-flashing { animation: sosFlash 0.5s infinite alternate; }
         @keyframes sosFlash { 0% { background-color: black; } 100% { background-color: #ff0000; } }
         .sos-text-big { font-size: 80px; font-weight: 900; color: white; letter-spacing: 5px; margin-bottom: 20px; }
@@ -236,6 +236,8 @@
     </div>
 
     <div id="page-login" class="auth-container">
+
+
         <img src="midnight-glow-over-peaks.3840x2160.jpg" class="header-banner" alt="Midnight Glow Header">
         <div class="hero-title" id="hero-title-login">Trek Tracker Pro</div>
         <div class="hero-subtitle" id="hero-sub-login">Navigate Nature with Confidence</div>
@@ -243,6 +245,25 @@
             <div class="glass-pill-btn login-lang-pos" onclick="toggleLanguage()">
                 <img class="lang-flag" id="lang-img-login" src="https://flagcdn.com/24x18/gb.png" style="width:16px;"> <span id="lang-text-login">EN</span>
             </div>
+
+<div id="sos-login-container" style="position: absolute; top: 415px; right: 20px; z-index: 10000;">
+            <button onclick="startEmergencyModeLogin()" 
+                style="
+                    background: linear-gradient(135deg, #ff4757, #ff6b81); /* ใช้สีแดงไล่เฉด */
+                    color: white; 
+                    border: none;
+                    padding: 8px 15px;         /* กำหนดขนาดแคปซูล */
+                    border-radius: 30px;       /* ทำให้เป็นทรงแคปซูล */
+                    font-weight: 600;
+                    font-size: 14px;
+                    cursor: pointer;
+                    text-transform: uppercase; /* ตัวพิมพ์ใหญ่ */
+                    letter-spacing: 0.5px;
+                    box-shadow: 0 4px 15px rgba(255, 71, 87, 0.4);
+                ">
+                SOS
+            </button>
+        </div>
             <img src="attachment_147008007.png" class="app-icon" alt="App Icon">
             <input type="text" id="login-user" class="auth-input" placeholder="Username">
             <input type="password" id="login-pass" class="auth-input" placeholder="Password">
@@ -367,6 +388,7 @@
     <script>
         // ⚠️⚠️⚠️ ใส่ URL API ของคุณตรงนี้ ⚠️⚠️⚠️
         const API_URL = "https://script.google.com/macros/s/AKfycby6M2uYrdElNMzdQXnJg01Xohq4P4urC5lJqZT62pMSJtviPaPQyPgEmmQipV0gGhCe/exec"; 
+	const FIXED_SOS_EMAIL = "supanart.su@gmail.com";
         // ⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️⚠️
 
         // Register Service Worker
@@ -594,9 +616,9 @@ function switchTab(t) {
             overlay.style.display = 'flex';
             overlay.classList.add('sos-flashing');
             
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            playBeep();
-            sosInterval = setInterval(playBeep, 1000);
+           // if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+           // playBeep();
+            //sosInterval = setInterval(playBeep, 1000);
 
             setMode('track');
             if (!trackingStarted) {
@@ -617,7 +639,7 @@ function switchTab(t) {
             setTimeout(() => { osc.stop(); }, 300);
         }
 
-        function stopEmergencyMode() {
+     function stopEmergencyMode() {
             const overlay = document.getElementById('emergency-overlay');
             overlay.style.display = 'none';
             overlay.classList.remove('sos-flashing');
@@ -631,8 +653,18 @@ function switchTab(t) {
                 if (linePoints.length > 0) {
                     showLoading(true, "SAVING SOS RECORD...");
                     var lastPt = linePoints[linePoints.length - 1];
-                    var userEmail = document.getElementById('sos-email').value || localStorage.getItem('trek_email_' + (currentUser ? currentUser.username : ""));
                     
+                    // 1. ดึงอีเมลฉุกเฉิน (จากตัว Override)
+                    var userEmail = localStorage.getItem('trek_emergency_override') 
+                                  || document.getElementById('sos-email').value 
+                                  || localStorage.getItem('trek_email_' + (currentUser ? currentUser.username : ""));
+                    
+                    // 2. ลบตัว Override ทิ้ง
+                    localStorage.removeItem('trek_emergency_override'); 
+                    
+                    // 3. 🚨 โค้ดที่แก้ไข: ถ้าไม่มี currentUser ให้ใช้ getDeviceName()
+                    var reporter = currentUser ? currentUser.username : getDeviceName(); 
+
                     var payload = { 
                         lat: lastPt[0], lon: lastPt[1], 
                         level: "จุดอันตราย", 
@@ -640,8 +672,8 @@ function switchTab(t) {
                         type: "track", 
                         pathData: JSON.stringify(linePoints), 
                         locationName: "Emergency Location", searchLocation: "SOS Route", province: "-", 
-                        reporterName: currentUser ? currentUser.username : "Guest",
-                        emergencyEmail: userEmail
+                        reporterName: reporter, // ✅ ใช้ชื่อที่กำหนดใหม่
+                        emergencyEmail: userEmail 
                     };
                     
                     callApi('saveData', payload).then(res => { 
@@ -656,7 +688,6 @@ function switchTab(t) {
                 resetForm();
             }
         }
-
 function startInternalNav(destLat, destLon) {
             if (!navigator.geolocation) { alert("GPS not supported"); return; }
             
@@ -1035,6 +1066,59 @@ function startInternalNav(destLat, destLon) {
         function manualRefresh() { var icon = document.getElementById('refresh-icon'); icon.classList.add('spin-anim'); showLoading(true, "REFRESHING..."); loadAllData(function(){ setTimeout(function(){ icon.classList.remove('spin-anim'); showLoading(false); }, 500); }); }
         function confirmDelete(timestampStr) { if(confirm(getTxt('delConfirm'))) { var myUser = currentUser ? currentUser.username : ""; showLoading(true, "DELETING..."); callApi('deleteItem', { timestamp: timestampStr, username: myUser }).then(res => { showLoading(false); if(res.status === 'SUCCESS') { alert(getTxt('delSuccess')); loadAllData(); } else { alert(getTxt('delFail')); } }); } }
 
+
+
+
+/**
+         * ดึงข้อมูลอุปกรณ์มาใช้เป็นชื่อชั่วคราว
+         * @returns {string} ชื่ออุปกรณ์ (เช่น 'Chrome on Android' หรือ 'Safari on Mac')
+         */
+        function getDeviceName() {
+            const ua = navigator.userAgent;
+            let device = "Unknown Device";
+
+            if (/Android/i.test(ua)) {
+                device = "Android Phone";
+            } else if (/iPhone/i.test(ua)) {
+                device = "iPhone";
+            } else if (/iPad/i.test(ua)) {
+                device = "iPad";
+            } else if (/Macintosh/i.test(ua)) {
+                device = "Macbook/PC";
+            } else if (/Windows/i.test(ua)) {
+                device = "Windows PC";
+            }
+
+            let browser = "Unknown Browser";
+            if (/CriOS/i.test(ua) || /Chrome/i.test(ua)) {
+                browser = "Chrome";
+            } else if (/Safari/i.test(ua) && !/Chrome/i.test(ua)) {
+                browser = "Safari";
+            } else if (/Firefox/i.test(ua)) {
+                browser = "Firefox";
+            }
+
+            return `${browser} on ${device}`;
+        }
+
+
+function startEmergencyModeLogin() {
+    var confirmMsg = curLang === 'th' 
+        ? `🚨 ยืนยันโหมด SOS: ระบบจะเริ่มติดตามพิกัดและส่งอีเมลฉุกเฉินไปที่ ${FIXED_SOS_EMAIL} ใช่หรือไม่?`
+        : `🚨 CONFIRM SOS: System will start tracking and send an emergency email to ${FIXED_SOS_EMAIL}?`;
+
+    if (!confirm(confirmMsg)) return;
+
+    // 1. ✅✅✅ ขั้นตอนสำคัญที่เพิ่ม: บังคับเปลี่ยนไปหน้าหลัก (Feed)
+    // เพื่อให้ `#emergency-overlay` และปุ่ม Stop แสดงผลได้
+    switchTab('feed'); 
+
+    // 2. เก็บอีเมลเป้าหมายลงใน LocalStorage ชั่วคราว
+    localStorage.setItem('trek_emergency_override', FIXED_SOS_EMAIL); 
+
+    // 3. เรียกใช้งานโหมดฉุกเฉินหลัก
+    startEmergencyMode();
+}
 function initMaps() { 
             if(mapReport) return; 
             
@@ -1100,6 +1184,12 @@ function initMaps() {
             } catch (e) { console.error("Map Init Error:", e); } 
         }
         
+
+
+
+
+
+
         function locateUser() { 
             if (currentMode === 'track') { 
                 if (!trackingStarted) {
