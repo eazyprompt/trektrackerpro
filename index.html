@@ -704,29 +704,28 @@ function switchTab(t) {
             document.getElementById('sos-email').value = savedEmail;
         }
 
-     function startEmergencyMode() {
+function startEmergencyMode() {
             document.getElementById('settings-modal').style.display = 'none'; 
             
-            // ✅ 1. ตั้งค่า: เตรียมส่งเมลทันทีที่จับ GPS ได้
-            // (เช็คก่อนว่าเคยส่งใน Session นี้ไปหรือยัง เพื่อกันส่งซ้ำตอน Zombie Mode ทำงาน)
+            // ✅✅✅ ล้างคิวเก่าทิ้งก่อนเริ่มใหม่ ✅✅✅
+            localStorage.removeItem('pending_sos_packet');
+            if (sosRetryInterval) { clearInterval(sosRetryInterval); sosRetryInterval = null; }
+
+            // ตั้งค่าให้ส่งทันทีที่จับ GPS ได้
             if (!localStorage.getItem('session_sos_sent')) {
                 isSosAlertPending = true;
             }
 
-            // เล่นเสียงเงียบ (Background Mode)
             var audio = document.getElementById('sos-silent-player');
             if (audio) audio.play().catch(()=>{});
 
-            // บันทึกสถานะ
             if (!localStorage.getItem('sos_start_time')) localStorage.setItem('sos_start_time', Date.now());
             localStorage.setItem('is_sos_active', 'true');
 
-            // แสดงจอแดง
             const overlay = document.getElementById('emergency-overlay');
             overlay.style.display = 'flex'; 
             overlay.classList.add('sos-flashing'); 
 
-            // เริ่ม GPS
             setMode('track');
             if (!trackingStarted) {
                 toggleTracking(true);
@@ -747,59 +746,54 @@ function switchTab(t) {
         }
 
 function stopEmergencyMode() {
-            // 1. ซ่อน Overlay และปิดไฟกระพริบ
+            // 1. ปิดหน้าจอแดง
             const overlay = document.getElementById('emergency-overlay');
             overlay.style.display = 'none';
             overlay.classList.remove('sos-flashing');
             
-            // 2. หยุดเสียงไซเรน (ถ้ามี)
+            // 2. หยุดเสียง
             if (sosInterval) clearInterval(sosInterval);
-
-            // 3. หยุดเสียงเงียบ (Silent Audio) - เพื่อให้ Browser หยุดทำงาน Background
             var audio = document.getElementById('sos-silent-player');
-            if (audio) {
-                audio.pause();
-                audio.currentTime = 0; 
-            }
+            if (audio) { audio.pause(); audio.currentTime = 0; }
 
-            // 4. ล้างค่าสถานะทั้งหมดใน LocalStorage (จบงาน)
+            // 3. ล้างสถานะ SOS
             localStorage.removeItem('is_sos_active');      
             localStorage.removeItem('sos_start_time');     
             localStorage.removeItem('trek_saved_route');   
-            localStorage.removeItem('session_sos_sent'); // อนุญาตให้ส่งใหม่ได้ในครั้งหน้า
+            localStorage.removeItem('session_sos_sent'); 
 
-            // 5. หยุดระบบติดตามพิกัด
+            // ✅✅✅ ส่วนสำคัญที่เพิ่ม: ฆ่าระบบ Retry ทิ้งทันที ✅✅✅
+            if (sosRetryInterval) { 
+                clearInterval(sosRetryInterval); 
+                sosRetryInterval = null; 
+                console.log("🛑 SOS Retry Loop Stopped.");
+            }
+            // ลบข้อมูลที่รอส่งทิ้งไปเลย (เพราะ User สั่งหยุดแล้ว)
+            localStorage.removeItem('pending_sos_packet'); 
+            // ✅✅✅ จบส่วนที่เพิ่ม ✅✅✅
+
+            // 4. หยุด GPS และส่งสรุปปิดท้าย (Final Summary)
             if (trackingStarted) {
-                if (watchId !== null) { 
-                    navigator.geolocation.clearWatch(watchId); 
-                    watchId = null; 
-                }
+                if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
                 stopTimer();
                 trackingStarted = false;
 
-                // 6. ส่งสรุปเส้นทาง (Final Summary) หากมีการเดินเกิดขึ้น
                 if (linePoints.length > 0) {
-                    showLoading(true, "SAVING SOS SUMMARY...");
+                    // ส่งข้อมูลสรุปปิดท้าย (ส่งครั้งเดียวจบ ไม่ต้อง Retry)
                     var lastPt = linePoints[linePoints.length - 1];
-                    
-                    // A. เตรียมอีเมล (Override -> Input -> Saved)
                     var userEmail = localStorage.getItem('trek_emergency_override') 
                                   || document.getElementById('sos-email').value 
                                   || localStorage.getItem('trek_email_' + (currentUser ? currentUser.username : ""));
-                    
-                    // ลบค่า Override ทิ้ง (จบภารกิจแล้ว)
                     localStorage.removeItem('trek_emergency_override'); 
                     
-                    // B. ระบุชื่อผู้รายงาน
                     var reporter = currentUser ? currentUser.username : getDeviceName();
 
-                    // C. สร้างชุดข้อมูลสรุปเส้นทาง (Track)
                     var payload = { 
                         lat: lastPt[0], lon: lastPt[1], 
                         level: "จุดอันตราย", 
-                        desc: "🚨 SOS CLOSED: Track Summary", // หัวข้อปิดงาน
+                        desc: "🚨 SOS CLOSED: Track Summary", 
                         type: "track", 
-                        pathData: JSON.stringify(linePoints), // เส้นทางทั้งหมดที่เดินมา
+                        pathData: JSON.stringify(linePoints), 
                         locationName: "Emergency Location", 
                         searchLocation: "SOS Route", 
                         province: "-", 
@@ -807,14 +801,11 @@ function stopEmergencyMode() {
                         emergencyEmail: userEmail 
                     };
                     
-                    // ส่งข้อมูลสรุปเข้า Server (อันนี้ใช้ callApi ปกติ เพราะถือว่าเหตุการณ์จบแล้ว)
                     callApi('saveData', payload).then(res => { 
-                        showLoading(false); 
                         resetForm(); 
                         switchTab('feed'); 
                     });
                 } else {
-                    // ถ้าเปิดแป๊บเดียวแล้วปิดเลย (ไม่มีพิกัด)
                     resetForm();
                 }
             } else {
