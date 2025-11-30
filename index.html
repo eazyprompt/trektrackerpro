@@ -1040,7 +1040,7 @@ function stopEmergencyMode() {
                 modePoint: "📍 Pin", modeLine: "〰️ Route", modeTrack: "🏃 Track", startBtn: "▶️ START", stopBtn: "⏹️ STOP", coordHint: "Tap map to pin ↗", descPlace: "Description...", 
                 // ✅ CHANGED: saveBtn text
                 saveBtn: "📌 PIN", 
-                saveRoute: "SAVE ROUTE", feedHeader: "Journey Log", feedSearch: "Search...", tab1: "Pin", tab2: "Log", tab3: "Map", confirmLogout: "Confirm Logout?", loading: "CONNECTING...", processing: "SAVING...", alertPin: "⚠️ Mark location first", alertName: "📝 Route Name:", alertSave: "✅ Saved!", alertLoginFail: "❌ Invalid User/Pass", txtLogin: "LOGGING IN...", alertOffline: "⚠️ No Internet! Saved to device. Will sync automatically when online.", selectHint: "-- Please Select Type --", alertSelect: "⚠️ Please select a type first",
+                saveRoute: "SAVE ROUTE", feedHeader: "Journey Log", feedSearch: "Search...", tab1: "Pin", tab2: "Log", tab3: "Map", confirmLogout: "Confirm Logout?", loading: "CONNECTING...", processing: "SAVING...", alertPin: "⚠️ Mark location first", alertName: "📝 Route Name:", alertSave: "✅ Saved!", alertLoginFail: "❌ Invalid User/Pass", alertStopTrack: "Please press STOP first.", txtLogin: "LOGGING IN...", alertOffline: "⚠️ No Internet! Saved to device. Will sync automatically when online.", selectHint: "-- Please Select Type --", alertSelect: "⚠️ Please select a type first",
                 btnNav: "🚗 NAVIGATE",
                 // ✅ ADDED: Popup nav button text
                 navInApp: "🗺️ NAVIGATE (In-App)",
@@ -1222,7 +1222,7 @@ function onPositionUpdate(pos) {
                 if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
                 stopTimer(); trackingStarted = false;
                 document.getElementById('btn-track-start').style.display = 'block'; document.getElementById('btn-track-stop').style.display = 'none'; trekForm.style.display = 'block'; document.getElementById('coord-text').innerText = `✅ Stopped.`;
-                alert(getTxt('alertStopTrack'));
+                //alert(getTxt('alertStopTrack'));
             }
         }
         function manualRefresh() { var icon = document.getElementById('refresh-icon'); icon.classList.add('spin-anim'); showLoading(true, "REFRESHING..."); loadAllData(function(){ setTimeout(function(){ icon.classList.remove('spin-anim'); showLoading(false); }, 500); }); }
