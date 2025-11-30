@@ -353,8 +353,9 @@
                     <textarea id="desc" rows="2" class="app-input" placeholder="Description..."></textarea>
                     
                     <div style="display:flex; gap:10px;">
+  <button type="button" class="submit-btn btn-blue" onclick="navigateToPin()" id="btn-nav" style="flex:1;">🚗 NAVIGATE</button>
                         <button type="button" class="submit-btn" onclick="submitReport()" id="btn-save" style="flex:1;">PIN</button>
-                        <button type="button" class="submit-btn btn-blue" onclick="navigateToPin()" id="btn-nav" style="flex:1;">🚗 NAVIGATE</button>
+                      
                     </div>
                 </form>
             </div>
@@ -594,7 +595,7 @@ function switchTab(t) {
             }
 
             // -----------------------------------------------------------
-            // 2. UI Switching: เปลี่ยนคลาส CSS ให้หน้าจอแสดงผล
+            // 2. UI Switching: เปลี่ยนหน้าจอ
             // -----------------------------------------------------------
             document.querySelectorAll('.page-content').forEach(p=>p.classList.remove('active')); 
             document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active')); 
@@ -602,11 +603,14 @@ function switchTab(t) {
             var idx=(t==='feed')?1:(t==='dashboard')?2:0; 
             document.querySelectorAll('.tab-btn')[idx].classList.add('active'); 
             
-            // จัดการ UI ของหน้า Pin (Report)
             const trekForm = document.getElementById('trekForm'); 
             const trackingUI = document.getElementById('tracking-ui'); 
             
+            // ===========================================================
+            // 📍 CASE 1: หน้า Pin (Report)
+            // ===========================================================
             if(t === 'report') { 
+                // จัดการ UI ของ Tracking
                 if (currentMode === 'track') { 
                     trackingUI.style.display = 'block'; 
                     trekForm.style.display = trackingStarted ? 'none' : 'block'; 
@@ -614,14 +618,17 @@ function switchTab(t) {
                     document.getElementById('btn-track-stop').style.display = trackingStarted ? 'block' : 'none'; 
                 } else { 
                     trackingUI.style.display = 'none'; trekForm.style.display = 'block'; 
-                } 
+                }
+
+                // ✅ Auto Locate (Silent Mode): ค้นหาพิกัดตัวเองทันทีแบบเงียบๆ
+                setTimeout(() => locateUser(true), 300);
             } else { 
                 trackingUI.style.display = 'none'; 
             }
 
-            // -----------------------------------------------------------
-            // 3. Dashboard Logic: กรองข้อมูลที่จะแสดงบนแผนที่รวม
-            // -----------------------------------------------------------
+            // ===========================================================
+            // 🗺️ CASE 2: หน้า Map (Dashboard)
+            // ===========================================================
             if(t === 'dashboard') {
                 if(feedLayerGroup) {
                     feedLayerGroup.clearLayers(); // ล้างหน้าจอเก่า
@@ -631,47 +638,42 @@ function switchTab(t) {
                         var rawDesc = r[4];
 
                         if (isSOS) {
-                            // 🔴 กรณีเป็น SOS: ให้แสดงเป็น "จุด" (ตัดข้อมูล Path ทิ้ง)
-                            // เพื่อไม่ให้เส้น SOS สีแดงพาดเต็มหน้าจอ Dashboard
+                            // 🔴 SOS: แสดงเป็น "จุด" (ตัด Path Data ทิ้ง เพื่อไม่ให้รก)
                             var cleanTextOnly = (rawDesc.indexOf(" || ") !== -1) ? rawDesc.split(" || ")[1] : "SOS Signal";
                             drawOnMap(feedLayerGroup, r[1], r[2], r[3], cleanTextOnly, true);
                         } else {
-                            // 🟢 กรณีอื่น (เส้นทางเดินป่า): ให้ส่งข้อมูลดิบไปเลย 
-                            // ระบบจะวาดเป็น "เส้น" ให้เห็นตามปกติ
+                            // 🟢 เส้นทางปกติ: ส่งข้อมูลดิบไปวาดเส้น
                             drawOnMap(feedLayerGroup, r[1], r[2], r[3], rawDesc, true);
                         }
                     });
 
-                    // ใส่ Layer กลับเข้า Map
                     if(mapDashboard && !mapDashboard.hasLayer(feedLayerGroup)){
                         feedLayerGroup.addTo(mapDashboard);
                     }
                 }
+
+                // ✅ Auto Locate (Silent Mode): เลื่อนกล้องไปหาเราทันที
+                setTimeout(() => locateDashboardUser(true), 300);
             }
             
-            // -----------------------------------------------------------
-            // 4. Feed Logic (Smart Loading): ป้องกันการกดรัว
-            // -----------------------------------------------------------
+            // ===========================================================
+            // 📖 CASE 3: หน้า Log (Feed) + Smart Loading
+            // ===========================================================
             if(t === 'feed') { 
                 showLoading(true, "LOADING LOGS...");
                 var btn = document.getElementById('btn-refresh'); 
                 btn.classList.add('spin-anim'); 
                 
-                // เริ่มจับเวลา
                 var startTime = Date.now();
 
-                // เรียกโหลดข้อมูล
                 loadAllData(function(){ 
-                    // คำนวณเวลาที่ผ่านไป
                     var endTime = Date.now();
                     var elapsedTime = endTime - startTime;
-                    var minWait = 1500; // ⏳ บังคับรออย่างน้อย 1.5 วินาที
+                    var minWait = 1500; // ⏳ บังคับรอ 1.5 วิ กัน User กดรัว
 
-                    // คำนวณเวลาที่ต้องรอเพิ่ม
                     var remainingTime = minWait - elapsedTime;
-                    if (remainingTime < 0) remainingTime = 0; // ถ้าโหลดนานกว่า 1.5 วิ ก็ไม่ต้องรอเพิ่ม
+                    if (remainingTime < 0) remainingTime = 0; 
 
-                    // ปิด Loading ตามเวลาที่คำนวณได้
                     setTimeout(() => { 
                         btn.classList.remove('spin-anim'); 
                         showLoading(false); 
@@ -679,9 +681,7 @@ function switchTab(t) {
                 }); 
             } 
             
-            // -----------------------------------------------------------
-            // 5. Map Refresh: แก้บั๊กแผนที่สีเทา/ขนาดผิด
-            // -----------------------------------------------------------
+            // Refresh Map Size (แก้บั๊กจอเทา)
             setTimeout(()=>{ 
                 if(t!=='feed'){ 
                     if(mapReport) mapReport.invalidateSize(); 
@@ -1394,45 +1394,72 @@ function initMaps() {
 
 
 
-        function locateUser() { 
+function locateUser(isAuto = false) { 
+            // ถ้ากำลัง Track อยู่ ให้ขยับกล้องไปที่จุดล่าสุดเฉยๆ
             if (currentMode === 'track') { 
                 if (!trackingStarted) {
-                     if (!navigator.geolocation) { alert("GPS not supported"); return; }
+                     if (!navigator.geolocation) { if(!isAuto) alert("GPS not supported"); return; }
                      document.getElementById('coord-text').innerText = getTxt('gpsWait'); 
-                     navigator.geolocation.getCurrentPosition(function(pos) { var lat = pos.coords.latitude; var lng = pos.coords.longitude; linePoints = [[lat, lng]]; mapReport.setView([lat, lng], 16); toggleTracking(true); alert(getTxt('gpsFound') + Math.round(pos.coords.accuracy) + "m)"); }, function(err) { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
-                } else { mapReport.setView(linePoints[linePoints.length - 1], 16); } return;
+                     navigator.geolocation.getCurrentPosition(function(pos) { 
+                         var lat = pos.coords.latitude; var lng = pos.coords.longitude; 
+                         linePoints = [[lat, lng]]; 
+                         mapReport.setView([lat, lng], 16); 
+                         toggleTracking(true); 
+                         if(!isAuto) alert(getTxt('gpsFound') + Math.round(pos.coords.accuracy) + "m)"); 
+                     }, function(err) { if(!isAuto) alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+                } else { 
+                    if(linePoints.length > 0) mapReport.setView(linePoints[linePoints.length - 1], 16); 
+                } 
+                return;
             }
-            if (!navigator.geolocation) { alert("GPS not supported"); return; } 
+
+            if (!navigator.geolocation) { if(!isAuto) alert("GPS not supported"); return; } 
+            
+            // เปลี่ยนข้อความสถานะ
             document.getElementById('coord-text').innerText = getTxt('gpsWait'); 
+            
             navigator.geolocation.getCurrentPosition(function(pos) { 
                 var lat = pos.coords.latitude; var lng = pos.coords.longitude; var acc = pos.coords.accuracy; 
-                mapReport.setView([lat, lng], 16); updateUserLocation(lat, lng, acc); getAddress(lat, lng); 
-                alert(getTxt('gpsFound') + Math.round(acc) + "m)"); 
+                
+                // ย้ายกล้องและปักหมุด
+                mapReport.setView([lat, lng], 16); 
+                updateUserLocation(lat, lng, acc); 
+                getAddress(lat, lng); 
+                
+                // ✅ ถ้าเป็น Auto (เปลี่ยนหน้ามา) ไม่ต้อง Alert
+                if(!isAuto) alert(getTxt('gpsFound') + Math.round(acc) + "m)"); 
+                
                 fetchWeather(lat, lng);
-            }, function(err) { alert("GPS Error: " + err.message); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
+            }, function(err) { 
+                if(!isAuto) alert("GPS Error: " + err.message); 
+            }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }); 
         }
 
-        function locateDashboardUser() { 
+function locateDashboardUser(isAuto = false) { 
+            // ถ้ากำลังนำทางอยู่ ให้ขยับกล้องไปหาตัวเราเลย
             if (navWatchId !== null && currentNavPos) {
                 mapDashboard.setView([currentNavPos.lat, currentNavPos.lng], 17);
                 return;
             }
 
-            if (!navigator.geolocation) { alert("GPS not supported"); return; } 
+            if (!navigator.geolocation) { if(!isAuto) alert("GPS not supported"); return; } 
             
             var btn = document.querySelector('.gps-pos-dashboard .gps-float-btn');
             var oldText = btn.innerHTML;
-            btn.innerHTML = "⏳";
+            if(!isAuto) btn.innerHTML = "⏳"; // เปลี่ยน icon เฉพาะตอนกดเอง
 
             navigator.geolocation.getCurrentPosition(function(pos) { 
                 var lat = pos.coords.latitude; var lng = pos.coords.longitude; 
+                
                 mapDashboard.setView([lat, lng], 16); 
+                
                 if(myLocationMarker) mapDashboard.removeLayer(myLocationMarker); 
                 myLocationMarker = L.circleMarker([lat, lng], { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 0.9 }).addTo(mapDashboard).bindPopup("You").openPopup(); 
-                btn.innerHTML = oldText;
+                
+                if(!isAuto) btn.innerHTML = oldText;
             }, function(err) { 
-                alert("GPS Error: " + err.message); 
-                btn.innerHTML = oldText;
+                if(!isAuto) alert("GPS Error: " + err.message); 
+                if(!isAuto) btn.innerHTML = oldText;
             }, { enableHighAccuracy: true }); 
         }
 
@@ -1477,7 +1504,7 @@ function initMaps() {
         }
         function showLogin() { document.getElementById('page-login').style.display = 'flex'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'none'; }
         function showRegister() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'flex'; }
-        function showApp() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'block'; document.getElementById('display-username').innerText = "👤 " + currentUser.name; setTimeout(function(){ initMaps(); loadAllData(); if(mapReport) mapReport.invalidateSize(); }, 200); }
+        function showApp() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'block'; document.getElementById('display-username').innerText = "👤 " + currentUser.name; setTimeout(function(){ initMaps(); switchTab('report'); loadAllData(); if(mapReport) mapReport.invalidateSize(); }, 200); }
      
 
 function doLogin() {
