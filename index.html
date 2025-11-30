@@ -186,11 +186,30 @@
         .gps-pos-dashboard { bottom: auto; top: 20px; right: 15px; } .gps-pos-report { top: 80px; right: 10px; bottom: auto; }
         .track-btn { flex: 1; padding: 12px; border: none; border-radius: 10px; font-weight: bold; cursor: pointer; color: white; display: flex; align-items: center; justify-content: center; gap: 8px; } .track-start { background: #10b981; } .track-stop { background: #ef4444; }
         
-        #loading-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(11, 17, 32, 0.95); display: none; align-items: center; justify-content: center; z-index: 10000; flex-direction: column; color: white; backdrop-filter: blur(5px); }
-        .header-tools { display: flex; gap: 8px; align-items: center; }
-        .spin-anim { animation: spin 0.8s linear; }
-        @keyframes spin { 100% { transform: rotate(360deg); } }
-        #sync-status { display: none; background: rgba(255, 193, 7, 0.2); border: 1px solid #ffc107; color: #ffc107; font-size: 11px; padding: 4px 10px; border-radius: 20px; align-items: center; gap: 5px; }
+#loading-overlay { 
+            position: fixed; 
+            top: 0; left: 0; right: 0; bottom: 0; 
+            background: rgba(11, 17, 32, 0.95); /* สีพื้นหลังตามโค้ดเดิม */
+            display: none; 
+            align-items: center; 
+            justify-content: center; 
+            
+            /* ✅ สำคัญมาก: ต้องสูงกว่า Login (20000) และ SOS (99999) */
+            z-index: 999998; 
+            
+            flex-direction: column; 
+            color: white; 
+            backdrop-filter: blur(5px); 
+        }
+
+        /* Animation การหมุน (ตามโค้ดเดิมของคุณ) */
+        .spin-anim { 
+            animation: spin 0.8s linear infinite; /* เติม infinite เพื่อให้หมุนไม่หยุด */
+        }
+
+        @keyframes spin { 
+            100% { transform: rotate(360deg); } 
+        }
 
         .modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.85); z-index: 15000; display: none; align-items: center; justify-content: center; backdrop-filter: blur(8px); }
         .text-btn { background: transparent; border: none; color: #94a3b8; margin-top: 15px; cursor: pointer; font-size: 14px; }
@@ -208,6 +227,14 @@
     </style>
 </head>
 <body>
+
+
+<div id="loading-overlay">
+        <img src="attachment_147008007.png" class="spin-anim" style="width: 60px; height: 60px;">
+        
+        <div style="margin-top:15px; letter-spacing:1px; font-weight:bold;" id="loading-text">CONNECTING...</div>
+    </div>
+
 <audio id="sos-silent-player" loop playsinline style="display:none;">
     <source src="https://raw.githubusercontent.com/anars/blank-audio/master/10-minutes-of-silence.mp3" type="audio/mpeg">
 </audio>
@@ -385,7 +412,22 @@
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/leaflet-control-geocoder/dist/Control.Geocoder.js"></script>
-    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js"></script>
+    <script src="https://unpkg.com/leaflet-routing-machine@latest/dist/leaflet-routing-machine.js">
+
+function showLoading(show, text) { 
+            var overlay = document.getElementById('loading-overlay');
+            var txtElem = document.getElementById('loading-text');
+            
+            if (show) { 
+                if(txtElem) txtElem.innerText = text || "LOADING..."; 
+                if(overlay) overlay.style.display = 'flex'; 
+            } else { 
+                if(overlay) overlay.style.display = 'none'; 
+            } 
+        }
+</script>
+
+
     
     <script>
         // ⚠️⚠️⚠️ ใส่ URL API ของคุณตรงนี้ ⚠️⚠️⚠️
@@ -1273,7 +1315,7 @@ function startEmergencyModeLogin() {
 
     // 1. ✅✅✅ ขั้นตอนสำคัญที่เพิ่ม: บังคับเปลี่ยนไปหน้าหลัก (Feed)
     // เพื่อให้ `#emergency-overlay` และปุ่ม Stop แสดงผลได้
-    switchTab('feed'); 
+    switchTab('dashboard'); 
 
     // 2. เก็บอีเมลเป้าหมายลงใน LocalStorage ชั่วคราว
     localStorage.setItem('trek_emergency_override', FIXED_SOS_EMAIL); 
@@ -1436,28 +1478,69 @@ function initMaps() {
         function showLogin() { document.getElementById('page-login').style.display = 'flex'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'none'; }
         function showRegister() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'flex'; }
         function showApp() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'block'; document.getElementById('display-username').innerText = "👤 " + currentUser.name; setTimeout(function(){ initMaps(); loadAllData(); if(mapReport) mapReport.invalidateSize(); }, 200); }
-     function doLogin() { 
-            var u=document.getElementById('login-user').value; 
-            var p=document.getElementById('login-pass').value; 
-            if(!u||!p) return; 
+     
+
+function doLogin() {
+            var u = document.getElementById('login-user').value;
+            var p = document.getElementById('login-pass').value;
             
-            showLoading(true, getTxt('loading')); 
-            
-            callApi('loginUser', { username: u, password: p }).then(res => { 
-                showLoading(false); 
-                if(res.status==='SUCCESS'){ 
-                    // ✅✅✅ เปลี่ยนเป็น localStorage (อยู่ยาวตลอดไป) ✅✅✅
-                    localStorage.setItem('trekUser', u); 
-                    localStorage.setItem('trekName', res.name); 
-                    
-                    currentUser={username:u, name:res.name}; 
-                    showApp(); 
-                } else { 
-                    alert(getTxt('alertLoginFail')); 
-                } 
-            }); 
+            // เช็คว่ากรอกข้อมูลหรือยัง
+            if (!u || !p) {
+                alert(curLang === 'th' ? "กรุณากรอกชื่อผู้ใช้และรหัสผ่าน" : "Please enter username and password.");
+                return;
+            }
+
+            // ✅ 1. แสดง Loading ทันที
+            showLoading(true, curLang === 'th' ? "กำลังเข้าสู่ระบบ..." : "LOGGING IN...");
+
+            callApi('loginUser', { username: u, password: p }).then(res => {
+                // ✅ 2. ปิด Loading เมื่อได้คำตอบ
+                showLoading(false);
+                
+                if (res.status === 'SUCCESS') {
+                    // บันทึกข้อมูลและเข้าแอป
+                    localStorage.setItem('trekUser', u);
+                    localStorage.setItem('trekName', res.name);
+                    currentUser = { username: u, name: res.name };
+                    showApp();
+                } else {
+                    alert(getTxt('alertLoginFail'));
+                }
+            }).catch(err => {
+                // ✅ 3. ปิด Loading กรณี Error
+                showLoading(false);
+                alert("Login Error: " + err.message);
+            });
         }
-        
+function doRegister() {
+            var n = document.getElementById('reg-name').value;
+            var u = document.getElementById('reg-user').value;
+            var p = document.getElementById('reg-pass').value;
+
+            if (!n || !u || !p) {
+                alert(curLang === 'th' ? "กรุณากรอกข้อมูลให้ครบถ้วน" : "Please fill in all fields.");
+                return;
+            }
+
+            // ✅ 1. แสดง Loading ทันที
+            showLoading(true, curLang === 'th' ? "กำลังสมัครสมาชิก..." : "REGISTERING...");
+
+            callApi('registerUser', { username: u, password: p, name: n }).then(res => {
+                // ✅ 2. ปิด Loading เมื่อเสร็จ
+                showLoading(false);
+
+                if (res.status === 'SUCCESS') {
+                    alert(curLang === 'th' ? "✅ สมัครสมาชิกสำเร็จ!" : "✅ Sign Up Successful!");
+                    showLogin(); // กลับไปหน้า Login
+                } else {
+                    alert("Registration Failed: " + (res.message || res.status));
+                }
+            }).catch(err => {
+                // ✅ 3. ปิด Loading กรณี Error
+                showLoading(false);
+                alert("Network Error: " + err.message);
+            });
+        }
         function doLogout() { 
             if(confirm(getTxt('confirmLogout'))) { 
                 closeSettings();
