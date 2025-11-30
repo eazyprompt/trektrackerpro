@@ -249,6 +249,32 @@
         <button class="sos-btn-stop" onclick="stopEmergencyMode()">STOP</button>
     </div>
 
+
+<div id="nav-mode-modal" class="modal-overlay">
+        <div class="glass-card" style="max-width: 280px; text-align: center; padding: 30px 20px;">
+            <h3 style="color:white; margin-top:0; font-size: 20px;" id="txt-nav-title">🏁 Travel Mode</h3>
+            
+            <p style="color:#cbd5e1; font-size:13px; margin-bottom:20px;" id="txt-nav-desc">Choose mode</p>
+            
+            <div style="display:flex; flex-direction:column; gap:12px; width:100%;">
+                <button class="auth-btn" onclick="confirmNavMode('driving')" 
+                        style="background: linear-gradient(to right, #3b82f6, #06b6d4); margin-top:0;">
+                    <span id="txt-nav-drive">🚗 Driving</span>
+                </button>
+                
+                <button class="auth-btn" onclick="confirmNavMode('walking')" 
+                        style="background: linear-gradient(to right, #10b981, #059669); margin-top:0;">
+                    <span id="txt-nav-walk">🚶 Walking</span>
+                </button>
+                
+                <button class="text-btn" onclick="document.getElementById('nav-mode-modal').style.display='none'">
+                    <span id="txt-nav-cancel">Cancel</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+
     <div id="settings-modal" class="modal-overlay">
         <div class="glass-card" style="max-width: 300px; padding-bottom: 30px;">
             <h2 style="margin-top:0; color:white; font-size:22px;">Settings</h2>
@@ -539,13 +565,39 @@ function showLoading(show, text) {
             }
         }
 
+// ตัวแปรกลางสำหรับจำปลายทาง (ไม่ว่าจะมาจากหน้า Pin หรือหน้า Card)
+        var pendingNavDest = null;
+
+        // 1. ฟังก์ชันใหม่: เรียกจากปุ่มบน Card
+        function onCardNavClick(lat, lon) {
+            // จำพิกัดไว้ในตัวแปรกลาง
+            pendingNavDest = { lat: lat, lng: lon };
+            // เปิด Pop-up เลือกโหมด
+            document.getElementById('nav-mode-modal').style.display = 'flex';
+        }
+
+        // 2. แก้ไขฟังก์ชันเดิม: หน้า Pin (Report)
         function navigateToPin() {
             if (!tempMarker) {
                 alert(getTxt('alertPin'));
                 return;
             }
-            var pos = tempMarker.getLatLng();
-            startInternalNav(pos.lat, pos.lng);
+            // จำพิกัดจากหมุดหน้า Pin
+            pendingNavDest = tempMarker.getLatLng();
+            document.getElementById('nav-mode-modal').style.display = 'flex';
+        }
+
+        // 3. แก้ไขฟังก์ชันยืนยัน: ให้ใช้ตัวแปรกลางแทน
+        function confirmNavMode(mode) {
+            document.getElementById('nav-mode-modal').style.display = 'none';
+            
+            if (pendingNavDest) {
+                // ส่งพิกัดที่จำไว้ไปเริ่มนำทาง
+                startInternalNav(pendingNavDest.lat, pendingNavDest.lng, mode);
+                
+                // ล้างค่าทิ้งเมื่อใช้เสร็จ
+                pendingNavDest = null;
+            }
         }
 
         function setMode(m) { 
@@ -815,42 +867,72 @@ function stopEmergencyMode() {
             }
         }
 
-// ตัวแปรสำหรับคุมจังหวะการอัปเดตเส้นทาง (กันเส้นกระพริบ)
-        var lastRouteUpdatePos = null; 
+var lastRouteUpdatePos = null; 
 
-        function startInternalNav(destLat, destLon) {
+        function startInternalNav(destLat, destLon, travelMode = 'driving') {
             if (!navigator.geolocation) { alert("GPS not supported"); return; }
             
             stopNavigation();
-            showLoading(true, "STARTING NAV...");
+            showLoading(true, "STARTING NAV (" + travelMode.toUpperCase() + ")...");
             switchTab('dashboard');
             
             lastRouteUpdatePos = null;
             currentDestLatLng = L.latLng(destLat, destLon);
 
             navigator.geolocation.getCurrentPosition(function(pos) {
-                var userLat = pos.coords.latitude;
-                var userLon = pos.coords.longitude;
-                var startLatLng = L.latLng(userLat, userLon);
-                
+                var startLatLng = L.latLng(pos.coords.latitude, pos.coords.longitude);
                 lastRouteUpdatePos = startLatLng; 
-                mapDashboard.setView(startLatLng, 18); // ซูมเข้าไปใกล้ๆ ตอนเริ่ม
+                
+                mapDashboard.setView(startLatLng, 18); 
+                mapDashboard.setBearing(0); 
+
+                // ✅✅✅ ส่วนที่แก้ไข: เลือก Server ให้ตรงกับโหมด ✅✅✅
+                var routerServiceUrl = '';
+                var routerProfile = '';
+
+                if (travelMode === 'walking') {
+                    // ใช้ Server สำหรับเดินเท้าโดยเฉพาะ (ละเอียดกว่า เข้าซอยได้)
+                    routerServiceUrl = 'https://routing.openstreetmap.de/routed-foot/route/v1';
+                    routerProfile = 'foot'; // OSRM Foot Profile
+                } else {
+                    // ใช้ Server สำหรับรถยนต์ (เน้นถนนใหญ่)
+                    routerServiceUrl = 'https://routing.openstreetmap.de/routed-car/route/v1';
+                    routerProfile = 'driving'; // OSRM Car Profile
+                }
 
                 try {
                     routingControl = L.Routing.control({
                         waypoints: [startLatLng, currentDestLatLng],
                         routeWhileDragging: false,
                         showAlternatives: false,
-                        fitSelectedRoutes: false, // ❌ ปิด Auto Zoom ของระบบ Routing (สำคัญมาก!)
+                        fitSelectedRoutes: false,
+                        
+                        // ✅ ตั้งค่า Router ตามเงื่อนไขด้านบน
+                        router: L.Routing.osrmv1({
+                            serviceUrl: routerServiceUrl,
+                            profile: routerProfile
+                        }),
+
                         lineOptions: { 
-                            styles: [{color: '#2ed573', opacity: 0.8, weight: 6}],
+                            // ถ้าเดินเท้า ใช้เส้นประ (Dot) ถ้ารถยนต์ใช้เส้นทึบ
+                            styles: [
+                                {
+                                    color: travelMode === 'walking' ? '#0fb9b1' : '#2ed573', 
+                                    opacity: 0.8, 
+                                    weight: 6,
+                                    dashArray: travelMode === 'walking' ? '1, 10' : null 
+                                }
+                            ],
                             missingRouteTolerance: 100
                         },
                         createMarker: function(i, wp, nWps) {
                             if (i === 0) return null;
                             return L.marker(wp.latLng, {
                                 icon: L.icon({
-                                    iconUrl: 'https://cdn-icons-png.flaticon.com/512/1483/1483336.png',
+                                    // เปลี่ยน icon ปลายทางตามโหมดได้ด้วย
+                                    iconUrl: travelMode === 'walking' 
+                                        ? 'https://cdn-icons-png.flaticon.com/512/1483/1483336.png' // รูปคนเดิน
+                                        : 'https://cdn-icons-png.flaticon.com/512/1483/1483336.png', // รูปธง/รถ
                                     iconSize: [32, 32], iconAnchor: [16, 32]
                                 })
                             });
@@ -861,9 +943,24 @@ function stopEmergencyMode() {
                         var routes = e.routes;
                         var summary = routes[0].summary;
                         var instructions = routes[0].instructions;
+                        
+                        // แปลงเวลาเป็น ชั่วโมง/นาที ให้สวยงาม
+                        var timeDisplay = "";
+                        if (summary.totalTime > 3600) {
+                            var h = Math.floor(summary.totalTime / 3600);
+                            var m = Math.round((summary.totalTime % 3600) / 60);
+                            timeDisplay = h + " hr " + m + " min";
+                        } else {
+                            timeDisplay = Math.round(summary.totalTime / 60) + " min";
+                        }
+
+                        var modeIcon = travelMode === 'walking' ? "🚶" : "🚗";
+
                         var html = `<div style="text-align:center; padding-bottom:10px; border-bottom:1px solid #444; margin-bottom:10px;">
-                                    <div style="font-size:18px; font-weight:bold; color:#2ed573;">${(summary.totalDistance/1000).toFixed(1)} km</div>
-                                    <div style="font-size:12px; color:#94a3b8;">${Math.round(summary.totalTime / 60)} min</div>
+                                    <div style="font-size:18px; font-weight:bold; color:#2ed573;">
+                                        ${modeIcon} ${(summary.totalDistance/1000).toFixed(1)} km
+                                    </div>
+                                    <div style="font-size:14px; color:#cbd5e1;">⏱️ ${timeDisplay}</div>
                                     </div>`;
                         
                         instructions.forEach(ins => {
@@ -871,59 +968,66 @@ function stopEmergencyMode() {
                            if(ins.type === "Straight") icon = "⬆️";
                            else if(ins.type === "Right") icon = "➡️";
                            else if(ins.type === "Left") icon = "⬅️";
-                           html += `<div class="route-step-item"><div class="route-step-icon">${icon}</div><div class="route-step-text">${ins.text}</div><div class="route-step-dist">${ins.distance < 1000 ? Math.round(ins.distance)+'m' : (ins.distance/1000).toFixed(1)+'km'}</div></div>`;
+                           
+                           // กรองคำสั่งให้สั้นลง
+                           var text = ins.text.replace('Head', 'Go').replace('Destination', 'Finish');
+
+                           html += `<div class="route-step-item">
+                                        <div class="route-step-icon">${icon}</div>
+                                        <div class="route-step-text">${text}</div>
+                                        <div class="route-step-dist">${ins.distance < 1000 ? Math.round(ins.distance)+'m' : (ins.distance/1000).toFixed(1)+'km'}</div>
+                                    </div>`;
                         });
                         document.getElementById('route-dynamic-content').innerHTML = html;
                     })
-                    .on('routingerror', function(e) { console.log("Routing Error (Keep old line):", e); })
+                    .on('routingerror', function(e) { console.log("Routing Error:", e); })
                     .addTo(mapDashboard);
 
                     document.getElementById('nav-stop-ui').style.display = 'block';
                     document.getElementById('btn-tool-route').style.display = 'flex'; 
                     showLoading(false);
 
-                    // -----------------------------------------------------------
-                    // 📡 เริ่มติดตามพิกัด (Real-time Tracking)
-                    // -----------------------------------------------------------
+                    // Start Tracking & Auto Rotate
                     navWatchId = navigator.geolocation.watchPosition(function(p) {
                         var lat = p.coords.latitude;
                         var lng = p.coords.longitude;
                         var newStart = L.latLng(lat, lng);
                         currentNavPos = { lat: lat, lng: lng };
 
-                        // วาดจุดสีฟ้า
                         if(myLocationMarker) mapDashboard.removeLayer(myLocationMarker);
                         myLocationMarker = L.circleMarker(newStart, { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 0.9 }).addTo(mapDashboard);
-                        if (p.coords.heading !== null && !isNaN(p.coords.heading)) {
-                            // mapDashboard.setBearing(ค่าองศา)
-                            mapDashboard.setBearing(p.coords.heading);
-                        }
-                        // ✅✅✅ ไฮไลท์: สั่งให้กล้องเลื่อนตามเราตลอดเวลา (Auto Scroll) ✅✅✅
+                        
                         mapDashboard.panTo(newStart); 
 
-                        // คำนวณระยะ
+                        // Auto Rotate (ทำงานเมื่อมีความเร็ว)
+                        if (p.coords.heading !== null && !isNaN(p.coords.heading) && p.coords.speed > 0.5) {
+                            mapDashboard.setBearing(p.coords.heading);
+                        }
+
                         var dist = newStart.distanceTo(currentDestLatLng);
                         var distEl = document.getElementById('dist-remain');
+                        
+                        var distTxt = dist < 1000 ? Math.round(dist) + " m" : (dist/1000).toFixed(1) + " km";
+                        
                         if (navigator.onLine) {
-                            distEl.innerText = "(" + Math.round(dist) + " m)";
+                            distEl.innerText = "(" + distTxt + ")";
                             distEl.style.color = "#cbd5e1";
                         } else {
-                            distEl.innerText = "(" + Math.round(dist) + " m) [OFFLINE]";
+                            distEl.innerText = "(" + distTxt + ") [OFFLINE]";
                             distEl.style.color = "#ff4757";
                         }
 
-                        // เช็คถึงที่หมาย
                         if (dist < 20) {
                             stopNavigation();
-                            alert("🎉 คุณเดินทางถึงที่หมายแล้ว!");
+                            alert("🎉 You have arrived!");
                             playBeep();
                             return;
                         }
 
-                        // อัปเดตเส้นทาง (ถ้าเดินเกิน 40 เมตร)
+                        // Update Route (Anti-Flicker Logic)
                         if (routingControl && navigator.onLine) {
                             if (lastRouteUpdatePos && newStart.distanceTo(lastRouteUpdatePos) < 40) {
-                                // ยังไม่ถึงระยะ ไม่ต้องทำอะไร
+                                // Skip update
                             } else {
                                 var wps = routingControl.getWaypoints();
                                 routingControl.setWaypoints([newStart, wps[1].latLng]);
@@ -936,6 +1040,9 @@ function stopEmergencyMode() {
                 } catch(e) { showLoading(false); alert("Error: " + e.message); }
             }, function(err) { showLoading(false); alert("GPS Error: " + err.message); }, { enableHighAccuracy: true });
         }
+
+
+
 
         function stopNavigation() {
             if (navWatchId !== null) {
@@ -1063,7 +1170,11 @@ function stopEmergencyMode() {
                 btnClearCache: "ล้างแคช (Clear Cache)", confirmClearCache: "ต้องการล้างแคชทั้งหมดหรือไม่? (แผนที่ออฟไลน์จะหายไป)",
                 modePoint: "📍 เส้นทาง", modeLine: "〰️ ลากเส้น", modeTrack: "🏃 ติดตาม", startBtn: "▶️ เริ่ม", stopBtn: "⏹️ หยุด", coordHint: "แตะแผนที่เพื่อระบุ ↗", descPlace: "รายละเอียด...", 
                 // ✅ CHANGED: saveBtn text
-                saveBtn: "📌 ปักหมุด", 
+                saveBtn: "📌 ปักหมุด", navTitle: "🏁 เลือกวิธีเดินทาง",
+                navDesc: "คำนวณเส้นทางและเวลาตามพาหนะ",
+                navDrive: "🚗 รถยนต์ (Driving)",
+                navWalk: "🚶 เดินเท้า (Walking)",
+                navCancel: "ยกเลิก",
                 saveRoute: "บันทึกเส้นทาง", feedHeader: "บันทึกการเดินทาง", feedSearch: "ค้นหา...", tab1: "นำทาง", tab2: "บันทึก", tab3: "แผนที่", confirmLogout: "ต้องการออกจากระบบ?", loading: "กำลังเชื่อมต่อ...", processing: "กำลังบันทึก...", alertPin: "⚠️ ระบุตำแหน่งก่อนครับ", alertName: "📝 ตั้งชื่อเส้นทาง:", alertSave: "✅ บันทึกแล้ว!", alertLoginFail: "❌ ชื่อผู้ใช้ผิด", alertStopTrack: "กรุณากดปุ่มหยุดก่อน", txtLogin: "กำลังเข้าสู่ระบบ...", alertOffline: "⚠️ ไม่มีอินเทอร์เน็ต! บันทึกลงเครื่องแล้ว จะส่งให้อัตโนมัติเมื่อมีเน็ต", selectHint: "-- กรุณาเลือกประเภท --", alertSelect: "⚠️ กรุณาเลือกประเภทสถานที่ก่อนบันทึกครับ",
                 btnNav: "🚗 นำทาง",
                 // ✅ ADDED: Popup nav button text
@@ -1078,7 +1189,11 @@ function stopEmergencyMode() {
                 modePoint: "📍 Route", modeLine: "〰️ Route", modeTrack: "🏃 Track", startBtn: "▶️ START", stopBtn: "⏹️ STOP", coordHint: "Tap map to pin ↗", descPlace: "Description...", 
                 // ✅ CHANGED: saveBtn text
                 saveBtn: "📌 PIN", 
-                saveRoute: "SAVE ROUTE", feedHeader: "Journey Log", feedSearch: "Search...", tab1: "Navigate", tab2: "Log", tab3: "Map", confirmLogout: "Confirm Logout?", loading: "CONNECTING...", processing: "SAVING...", alertPin: "⚠️ Mark location first", alertName: "📝 Route Name:", alertSave: "✅ Saved!", alertLoginFail: "❌ Invalid User/Pass", alertStopTrack: "Please press STOP first.", txtLogin: "LOGGING IN...", alertOffline: "⚠️ No Internet! Saved to device. Will sync automatically when online.", selectHint: "-- Please Select Type --", alertSelect: "⚠️ Please select a type first",
+                saveRoute: "SAVE ROUTE", feedHeader: "Journey Log", feedSearch: "Search...", tab1: "Navigate", tab2: "Log", tab3: "Map", confirmLogout: "Confirm Logout?", loading: "CONNECTING...", processing: "SAVING...", alertPin: "⚠️ Mark location first", alertName: "📝 Route Name:", alertSave: "✅ Saved!", alertLoginFail: "❌ Invalid User/Pass", alertStopTrack: "Please press STOP first.", txtLogin: "LOGGING IN...", alertOffline: "⚠️ No Internet! Saved to device. Will sync automatically when online.", selectHint: "-- Please Select Type --", alertSelect: "⚠️ Please select a type first",navTitle: "🏁 Travel Mode",
+                navDesc: "Calculate route based on mode",
+                navDrive: "🚗 Driving",
+                navWalk: "🚶 Walking",
+                navCancel: "Cancel",
                 btnNav: "🚗 NAVIGATE",
                 // ✅ ADDED: Popup nav button text
                 navInApp: "🗺️ NAVIGATE (In-App)",
@@ -1098,6 +1213,20 @@ function stopEmergencyMode() {
         function applyLanguage() {
             if (!langData[curLang]) curLang = 'en';
             const t = langData[curLang]; const langTxt = curLang.toUpperCase();
+const elNavTitle = document.getElementById('txt-nav-title');
+            if(elNavTitle) elNavTitle.innerText = t.navTitle;
+
+            const elNavDesc = document.getElementById('txt-nav-desc');
+            if(elNavDesc) elNavDesc.innerText = t.navDesc;
+
+            const elNavDrive = document.getElementById('txt-nav-drive');
+            if(elNavDrive) elNavDrive.innerText = t.navDrive;
+
+            const elNavWalk = document.getElementById('txt-nav-walk');
+            if(elNavWalk) elNavWalk.innerText = t.navWalk;
+
+            const elNavCancel = document.getElementById('txt-nav-cancel');
+            if(elNavCancel) elNavCancel.innerText = t.navCancel;
             document.querySelectorAll('.lang-flag').forEach(el => el.src = t.flag);
             document.querySelectorAll('#lang-text, #lang-text-login, #lang-text-reg, #lang-text-report').forEach(el => el.innerText = langTxt);
             
@@ -1721,7 +1850,7 @@ var currentFocusTimer = null;
 
                         var btnTxt = getTxt('navInApp');
                         var displayTitle = getLevelDisplay(record[3]);
-                        var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="startInternalNav(${record[1]}, ${record[2]})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
+                        var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="onCardNavClick(${record[1]}, ${record[2]})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
                         polyline.bindPopup(popupContent);
 
                         // D. สั่ง Zoom (ปิด Animation เพื่อความแม่นยำ)
@@ -1850,7 +1979,7 @@ function drawSecurePath(points, color, popupContent) {
                     var cardDesc = isLineOrTrack ? r[4].split(" || ")[1] : r[4]; 
                     
                     // ปุ่ม Nav ใน Card (เพิ่ม event.stopPropagation เพื่อไม่ให้กดแล้วเด้งไปหน้า Map)
-                    var navBtn = `<button onclick="startInternalNav(${r[1]}, ${r[2]}); event.stopPropagation();" style="background:transparent; border:1px solid #2ed573; color:#2ed573; border-radius:20px; padding:2px 8px; font-size:11px; cursor:pointer; margin-left:5px;">🗺️ NAV</button>`;
+                    var navBtn = `<button onclick="onCardNavClick(${r[1]}, ${r[2]}); event.stopPropagation();" style="background:transparent; border:1px solid #2ed573; color:#2ed573; border-radius:20px; padding:2px 8px; font-size:11px; cursor:pointer; margin-left:5px;">🗺️ NAV</button>`;
                     
                     // สร้าง HTML Card
                     html += `<div class="feed-card" style="border-left-color:${color}" onclick="focusOnCard('${r[0]}')">
@@ -1890,7 +2019,7 @@ function drawSecurePath(points, color, popupContent) {
             // ✅ ADDED: Dynamic popup button text & Title translation
             var displayTitle = getLevelDisplay(l); // Translate title
             var btnTxt = getTxt('navInApp');
-            var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="startInternalNav(${lat}, ${lon})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
+            var popupContent = `<div style='text-align:center;'><b>${displayTitle}</b><br><button onclick="onCardNavClick(${lat}, ${lon})" style='margin-top:5px; background:#2ed573; color:white; border:none; padding:4px 10px; border-radius:10px; cursor:pointer;'>${btnTxt}</button></div>`;
             if(d.indexOf("[PATH_DATA]")!=-1) { 
                 try { 
                     L.polyline(JSON.parse(d.split(" || ")[0].replace("[PATH_DATA]:","")), {color: c, weight: isD?3:5}).bindPopup(popupContent).addTo(m); 
@@ -1906,64 +2035,81 @@ function drawSecurePath(points, color, popupContent) {
         checkAuth();
 
 // ✅✅✅ [Zombie Mode Part 2] ระบบกู้ชีพเมื่อเปิดแอปใหม่ ✅✅✅
+     // ===============================================================
+        // ✅ GLOBAL LOAD EVENT (ฉบับแก้บั๊กข้อมูลไหล)
+        // ===============================================================
         window.addEventListener('load', () => {
-            // 1. โหลดการตั้งค่าพื้นฐาน
+            
+            // 1. พื้นฐาน
             updateSyncStatus();
             syncOfflineData();
-            
-            // 2. เช็คว่ามี Login ค้างไว้ไหม (จะได้ไม่ต้อง Login ใหม่)
             checkAuth(); 
-// 3. 🚨 SOS RETRY CHECK (ตรวจสอบคิว SOS ค้างท่อ)
-            // ถ้าเคยส่ง SOS แล้วเน็ตหลุด ระบบจะกู้คืนคิวส่งซ้ำให้ทันที
-            if (localStorage.getItem('pending_sos_packet')) {
-                console.log("⚠️ Found pending SOS packet. Restarting retry queue...");
-}
-                queueSosRetry(null); // เริ่มนับเวลาถอยหลังส่งใหม่
-            // 3. ตรวจสอบสถานะ SOS
-            var wasSOS = localStorage.getItem('is_sos_active') === 'true';
-            
-            if (wasSOS) {
-                console.log("⚠️ ZOMBIE MODE ACTIVATED: Resuming SOS...");
 
-                // รอสักพักให้ Map โหลดเสร็จ
+            // ✅✅✅ ส่วนสำคัญที่เพิ่ม: เช็คสถานะ SOS ก่อนทำอะไรทั้งสิ้น ✅✅✅
+            var wasSOS = localStorage.getItem('is_sos_active') === 'true';
+
+            if (!wasSOS) {
+                // 🧹 ถ้าไม่ได้เปิด SOS ค้างไว้ -> ล้างขยะทิ้งทันที!
+                // ป้องกันไม่ให้ข้อมูลเก่าหลุดส่งไปที่ Google Sheet
+                if (localStorage.getItem('pending_sos_packet')) {
+                    console.log("🧹 Cleanup: Removing ghost SOS packet.");
+                    localStorage.removeItem('pending_sos_packet');
+                }
+                localStorage.removeItem('session_sos_sent');
+            }
+
+            // 2. 🚨 SOS RETRY (ทำงานเฉพาะตอน SOS Active เท่านั้น)
+            if (wasSOS && localStorage.getItem('pending_sos_packet')) {
+                console.log("⚠️ Resuming SOS Retry Queue...");
+                queueSosRetry(null); 
+            }
+
+            // 3. 🧟‍♂️ ZOMBIE MODE (กู้ชีพ)
+            if (wasSOS) {
+                console.log("⚠️ ZOMBIE MODE ACTIVATED...");
+
+                // A. เปิดหน้าจอแดง
+                const overlay = document.getElementById('emergency-overlay');
+                if(overlay) {
+                    overlay.style.display = 'flex'; 
+                    overlay.classList.add('sos-flashing'); 
+                }
+
+                // B. เล่นเสียงเงียบ
+                var audio = document.getElementById('sos-silent-player');
+                if (audio) audio.play().catch(()=>{});
+
+                // C. Lock Screen
+                if('wakeLock' in navigator) navigator.wakeLock.request('screen').catch(()=>{});
+
+                // D. กู้คืน Map และ Tracking
                 setTimeout(() => {
-                    // A. กู้คืนเส้นทางเดิมจากความทรงจำ (LocalStorage)
                     var savedRoute = localStorage.getItem('trek_saved_route');
                     if (savedRoute) {
                         try {
                             linePoints = JSON.parse(savedRoute);
-                            // วาดเส้นเดิมกลับมาบนแผนที่
                             if (linePoints.length > 0 && mapReport) {
+                                if (tempLine) mapReport.removeLayer(tempLine);
                                 tempLine = L.polyline(linePoints, {color: '#10b981', weight: 4}).addTo(mapReport);
-                                // ซูมไปที่จุดล่าสุด
                                 var lastPt = linePoints[linePoints.length-1];
                                 mapReport.setView(lastPt, 16);
+                                document.getElementById('coord-text').innerText = `🏃 ${linePoints.length} pts (Restored)`;
                             }
-                        } catch(e) { console.error("Restore route error", e); }
+                        } catch(e) {}
                     }
 
-                    // B. เปิดหน้าจอแดง (Overlay) กลับมา
-                    const overlay = document.getElementById('emergency-overlay');
-                    if(overlay) {
-                        overlay.style.display = 'flex'; 
-                        overlay.classList.add('sos-flashing'); 
-                    }
-
-                    // C. เล่นเสียงเงียบต่อ (เพื่อให้ทำงาน Background ได้)
-                    var audio = document.getElementById('sos-silent-player');
-                    if (audio) audio.play().catch(()=>{});
-
-                    // D. เริ่มจับ GPS ต่อทันที
                     setMode('track');
                     trackingStarted = true;
+                    
                     if (navigator.geolocation) {
-                        watchId = navigator.geolocation.watchPosition(onPositionUpdate, (err) => console.log(err), { enableHighAccuracy: true });
-                        
-                        // กู้คืนเวลา (Timer)
+                        watchId = navigator.geolocation.watchPosition(
+                            onPositionUpdate, 
+                            (err) => console.log("GPS Error:", err), 
+                            { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+                        );
                         startTimer(); 
                     }
-                    
-                }, 1000); // รอ 1 วินาทีให้แอปพร้อม
+                }, 1000);
             }
         });
     </script>
