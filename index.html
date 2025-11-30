@@ -208,7 +208,9 @@
     </style>
 </head>
 <body>
-
+<audio id="sos-silent-player" loop playsinline style="display:none;">
+    <source src="https://raw.githubusercontent.com/anars/blank-audio/master/10-minutes-of-silence.mp3" type="audio/mpeg">
+</audio>
     <div id="loading-overlay">
         <img src="attachment_147008007.png" style="width:60px; height:60px; animation: pulse 1s infinite;">
         <div style="margin-top:15px; letter-spacing:1px;" id="loading-text">CONNECTING...</div>
@@ -418,7 +420,57 @@
         var navWatchId = null;
         var currentDestLatLng = null;
         var currentNavPos = null; 
+// ตัวแปรสำหรับระบบส่งซ้ำ
+        var sosRetryInterval = null;
+        var isSosAlertPending = false; // ตัวบอกว่าต้องส่งแจ้งเตือนทันทีที่จับ GPS ได้
 
+        // ฟังก์ชันส่งข้อมูล SOS พร้อมระบบ Retry
+        function sendSosWithRetry(data) {
+            // ลองส่งข้อมูลทันที
+            callApi('saveData', data).then(res => {
+                if (res.status === 'SUCCESS') {
+                    // ✅ ส่งสำเร็จ
+                    //alert("✅ SOS Alert Sent Successfully!");
+                    localStorage.removeItem('pending_sos_packet'); // ลบออกจากคิว
+                    if (sosRetryInterval) {
+                        clearInterval(sosRetryInterval); // หยุดการส่งซ้ำ
+                        sosRetryInterval = null;
+                    }
+                } else {
+                    // ❌ ส่งไม่ผ่าน (Server Error) -> เข้าคิว
+                    queueSosRetry(data);
+                }
+            }).catch(err => {
+                // ❌ ส่งไม่ผ่าน (Network Error) -> เข้าคิว
+                console.error("SOS Send Fail:", err);
+                queueSosRetry(data);
+            });
+        }
+
+        // ฟังก์ชันเข้าคิวและตั้งเวลาส่งทุก 5 นาที
+        function queueSosRetry(data) {
+            console.log("⚠️ Offline/Error: Queuing SOS for retry...");
+            
+            // 1. บันทึกข้อมูลลงเครื่อง (กันปิดแอปแล้วหาย)
+            localStorage.setItem('pending_sos_packet', JSON.stringify(data));
+            
+            // 2. ตั้งเวลาส่งซ้ำทุก 5 นาที (300,000 ms)
+            if (!sosRetryInterval) {
+                sosRetryInterval = setInterval(() => {
+                    console.log("🔄 Retrying SOS Email (5 min interval)...");
+                    var pendingData = localStorage.getItem('pending_sos_packet');
+                    
+                    if (pendingData && navigator.onLine) {
+                        // ถ้ามีข้อมูลและมีเน็ต ให้ลองส่งใหม่
+                        sendSosWithRetry(JSON.parse(pendingData));
+                    } else if (!pendingData) {
+                        // ถ้าข้อมูลหายไปแล้ว (ส่งผ่านแล้ว) ก็หยุดทำงาน
+                        clearInterval(sosRetryInterval);
+                        sosRetryInterval = null;
+                    }
+                }, 300000); // 5 นาที
+            }
+        }
         // ✅ Function to Toggle Panels & Show All Pins
         function toggleMapPanel(type) {
             var panel = document.getElementById('panel-' + type);
@@ -610,16 +662,29 @@ function switchTab(t) {
             document.getElementById('sos-email').value = savedEmail;
         }
 
-        function startEmergencyMode() {
-            document.getElementById('settings-modal').style.display = 'none';
-            const overlay = document.getElementById('emergency-overlay');
-            overlay.style.display = 'flex';
-            overlay.classList.add('sos-flashing');
+     function startEmergencyMode() {
+            document.getElementById('settings-modal').style.display = 'none'; 
             
-           // if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-           // playBeep();
-            //sosInterval = setInterval(playBeep, 1000);
+            // ✅ 1. ตั้งค่า: เตรียมส่งเมลทันทีที่จับ GPS ได้
+            // (เช็คก่อนว่าเคยส่งใน Session นี้ไปหรือยัง เพื่อกันส่งซ้ำตอน Zombie Mode ทำงาน)
+            if (!localStorage.getItem('session_sos_sent')) {
+                isSosAlertPending = true;
+            }
 
+            // เล่นเสียงเงียบ (Background Mode)
+            var audio = document.getElementById('sos-silent-player');
+            if (audio) audio.play().catch(()=>{});
+
+            // บันทึกสถานะ
+            if (!localStorage.getItem('sos_start_time')) localStorage.setItem('sos_start_time', Date.now());
+            localStorage.setItem('is_sos_active', 'true');
+
+            // แสดงจอแดง
+            const overlay = document.getElementById('emergency-overlay');
+            overlay.style.display = 'flex'; 
+            overlay.classList.add('sos-flashing'); 
+
+            // เริ่ม GPS
             setMode('track');
             if (!trackingStarted) {
                 toggleTracking(true);
@@ -639,80 +704,115 @@ function switchTab(t) {
             setTimeout(() => { osc.stop(); }, 300);
         }
 
-     function stopEmergencyMode() {
+function stopEmergencyMode() {
+            // 1. ซ่อน Overlay และปิดไฟกระพริบ
             const overlay = document.getElementById('emergency-overlay');
             overlay.style.display = 'none';
             overlay.classList.remove('sos-flashing');
+            
+            // 2. หยุดเสียงไซเรน (ถ้ามี)
             if (sosInterval) clearInterval(sosInterval);
 
+            // 3. หยุดเสียงเงียบ (Silent Audio) - เพื่อให้ Browser หยุดทำงาน Background
+            var audio = document.getElementById('sos-silent-player');
+            if (audio) {
+                audio.pause();
+                audio.currentTime = 0; 
+            }
+
+            // 4. ล้างค่าสถานะทั้งหมดใน LocalStorage (จบงาน)
+            localStorage.removeItem('is_sos_active');      
+            localStorage.removeItem('sos_start_time');     
+            localStorage.removeItem('trek_saved_route');   
+            localStorage.removeItem('session_sos_sent'); // อนุญาตให้ส่งใหม่ได้ในครั้งหน้า
+
+            // 5. หยุดระบบติดตามพิกัด
             if (trackingStarted) {
-                if (watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+                if (watchId !== null) { 
+                    navigator.geolocation.clearWatch(watchId); 
+                    watchId = null; 
+                }
                 stopTimer();
                 trackingStarted = false;
 
+                // 6. ส่งสรุปเส้นทาง (Final Summary) หากมีการเดินเกิดขึ้น
                 if (linePoints.length > 0) {
-                    showLoading(true, "SAVING SOS RECORD...");
+                    showLoading(true, "SAVING SOS SUMMARY...");
                     var lastPt = linePoints[linePoints.length - 1];
                     
-                    // 1. ดึงอีเมลฉุกเฉิน (จากตัว Override)
+                    // A. เตรียมอีเมล (Override -> Input -> Saved)
                     var userEmail = localStorage.getItem('trek_emergency_override') 
                                   || document.getElementById('sos-email').value 
                                   || localStorage.getItem('trek_email_' + (currentUser ? currentUser.username : ""));
                     
-                    // 2. ลบตัว Override ทิ้ง
+                    // ลบค่า Override ทิ้ง (จบภารกิจแล้ว)
                     localStorage.removeItem('trek_emergency_override'); 
                     
-                    // 3. 🚨 โค้ดที่แก้ไข: ถ้าไม่มี currentUser ให้ใช้ getDeviceName()
-                    var reporter = currentUser ? currentUser.username : getDeviceName(); 
+                    // B. ระบุชื่อผู้รายงาน
+                    var reporter = currentUser ? currentUser.username : getDeviceName();
 
+                    // C. สร้างชุดข้อมูลสรุปเส้นทาง (Track)
                     var payload = { 
                         lat: lastPt[0], lon: lastPt[1], 
                         level: "จุดอันตราย", 
-                        desc: "🚨 SOS EMERGENCY TRACK (Auto-Saved)", 
+                        desc: "🚨 SOS CLOSED: Track Summary", // หัวข้อปิดงาน
                         type: "track", 
-                        pathData: JSON.stringify(linePoints), 
-                        locationName: "Emergency Location", searchLocation: "SOS Route", province: "-", 
-                        reporterName: reporter, // ✅ ใช้ชื่อที่กำหนดใหม่
+                        pathData: JSON.stringify(linePoints), // เส้นทางทั้งหมดที่เดินมา
+                        locationName: "Emergency Location", 
+                        searchLocation: "SOS Route", 
+                        province: "-", 
+                        reporterName: reporter, 
                         emergencyEmail: userEmail 
                     };
                     
+                    // ส่งข้อมูลสรุปเข้า Server (อันนี้ใช้ callApi ปกติ เพราะถือว่าเหตุการณ์จบแล้ว)
                     callApi('saveData', payload).then(res => { 
                         showLoading(false); 
                         resetForm(); 
                         switchTab('feed'); 
                     });
                 } else {
+                    // ถ้าเปิดแป๊บเดียวแล้วปิดเลย (ไม่มีพิกัด)
                     resetForm();
                 }
             } else {
                 resetForm();
             }
         }
-function startInternalNav(destLat, destLon) {
+
+// ตัวแปรสำหรับคุมจังหวะการอัปเดตเส้นทาง (กันเส้นกระพริบ)
+        var lastRouteUpdatePos = null; 
+
+        function startInternalNav(destLat, destLon) {
             if (!navigator.geolocation) { alert("GPS not supported"); return; }
             
-            // 1. เคลียร์ค่าเก่าและเตรียมหน้าจอ
             stopNavigation();
             showLoading(true, "STARTING NAV...");
             switchTab('dashboard');
+            
+            lastRouteUpdatePos = null;
             currentDestLatLng = L.latLng(destLat, destLon);
 
-            // 2. หาพิกัดเริ่มต้น
             navigator.geolocation.getCurrentPosition(function(pos) {
                 var userLat = pos.coords.latitude;
                 var userLon = pos.coords.longitude;
                 var startLatLng = L.latLng(userLat, userLon);
+                
+                lastRouteUpdatePos = startLatLng; 
+                mapDashboard.setView(startLatLng, 18); // ซูมเข้าไปใกล้ๆ ตอนเริ่ม
 
                 try {
-                    // 3. สร้าง Routing Machine Control
                     routingControl = L.Routing.control({
                         waypoints: [startLatLng, currentDestLatLng],
                         routeWhileDragging: false,
                         showAlternatives: false,
-			fitSelectedRoutes: false,  // ❌ ห้ามซูมเข้าออกอัตโนมัติเมื่อคำนวณเส้นทางเสร็จ
-                        lineOptions: { styles: [{color: '#2ed573', opacity: 0.8, weight: 6}] },
+                        fitSelectedRoutes: false, // ❌ ปิด Auto Zoom ของระบบ Routing (สำคัญมาก!)
+                        lineOptions: { 
+                            styles: [{color: '#2ed573', opacity: 0.8, weight: 6}],
+                            missingRouteTolerance: 100
+                        },
                         createMarker: function(i, wp, nWps) {
-                            if (i === 0) return null; // ไม่แสดงหมุดจุดเริ่ม (เพราะเรามีจุดสีฟ้าแล้ว)
+                            if (i === 0) return null;
                             return L.marker(wp.latLng, {
                                 icon: L.icon({
                                     iconUrl: 'https://cdn-icons-png.flaticon.com/512/1483/1483336.png',
@@ -720,101 +820,83 @@ function startInternalNav(destLat, destLon) {
                                 })
                             });
                         }, 
-                        addWaypoints: false,
-                        fitSelectedRoutes: true
+                        addWaypoints: false
                     })
                     .on('routesfound', function(e) {
-                        // เมื่อคำนวณเส้นทางสำเร็จ ให้แสดงข้อมูลใน Panel
                         var routes = e.routes;
                         var summary = routes[0].summary;
                         var instructions = routes[0].instructions;
-                        
                         var html = `<div style="text-align:center; padding-bottom:10px; border-bottom:1px solid #444; margin-bottom:10px;">
                                     <div style="font-size:18px; font-weight:bold; color:#2ed573;">${(summary.totalDistance/1000).toFixed(1)} km</div>
                                     <div style="font-size:12px; color:#94a3b8;">${Math.round(summary.totalTime / 60)} min</div>
                                     </div>`;
                         
                         instructions.forEach(ins => {
-                            var icon = "";
-                            if(ins.type === "Straight") icon = "⬆️";
-                            else if(ins.type === "SlightRight") icon = "↗️";
-                            else if(ins.type === "Right") icon = "➡️";
-                            else if(ins.type === "SharpRight") icon = "↘️";
-                            else if(ins.type === "TurnAround") icon = "↩️";
-                            else if(ins.type === "SharpLeft") icon = "↙️";
-                            else if(ins.type === "Left") icon = "⬅️";
-                            else if(ins.type === "SlightLeft") icon = "↖️";
-                            else icon = "⏺️";
-
-                            html += `<div class="route-step-item">
-                                        <div class="route-step-icon">${icon}</div>
-                                        <div class="route-step-text">${ins.text}</div>
-                                        <div class="route-step-dist">${ins.distance < 1000 ? Math.round(ins.distance)+'m' : (ins.distance/1000).toFixed(1)+'km'}</div>
-                                     </div>`;
+                           var icon = "⏺️";
+                           if(ins.type === "Straight") icon = "⬆️";
+                           else if(ins.type === "Right") icon = "➡️";
+                           else if(ins.type === "Left") icon = "⬅️";
+                           html += `<div class="route-step-item"><div class="route-step-icon">${icon}</div><div class="route-step-text">${ins.text}</div><div class="route-step-dist">${ins.distance < 1000 ? Math.round(ins.distance)+'m' : (ins.distance/1000).toFixed(1)+'km'}</div></div>`;
                         });
-                        
                         document.getElementById('route-dynamic-content').innerHTML = html;
                     })
+                    .on('routingerror', function(e) { console.log("Routing Error (Keep old line):", e); })
                     .addTo(mapDashboard);
 
-                    // แสดง UI นำทาง
                     document.getElementById('nav-stop-ui').style.display = 'block';
                     document.getElementById('btn-tool-route').style.display = 'flex'; 
                     showLoading(false);
 
-                    // 4. เริ่มติดตามพิกัดผู้ใช้แบบ Real-time
+                    // -----------------------------------------------------------
+                    // 📡 เริ่มติดตามพิกัด (Real-time Tracking)
+                    // -----------------------------------------------------------
                     navWatchId = navigator.geolocation.watchPosition(function(p) {
                         var lat = p.coords.latitude;
                         var lng = p.coords.longitude;
-                        currentNavPos = { lat: lat, lng: lng };
                         var newStart = L.latLng(lat, lng);
+                        currentNavPos = { lat: lat, lng: lng };
 
-                        // อัปเดตจุดสีฟ้า (User Marker) เสมอ ไม่ว่ามีเน็ตหรือไม่
+                        // วาดจุดสีฟ้า
                         if(myLocationMarker) mapDashboard.removeLayer(myLocationMarker);
                         myLocationMarker = L.circleMarker(newStart, { radius: 8, fillColor: "#3b82f6", color: "#ffffff", weight: 2, opacity: 1, fillOpacity: 0.9 }).addTo(mapDashboard);
+                        
+                        // ✅✅✅ ไฮไลท์: สั่งให้กล้องเลื่อนตามเราตลอดเวลา (Auto Scroll) ✅✅✅
+                        mapDashboard.panTo(newStart); 
 
-                        // --- ส่วนสำคัญ: เช็คเน็ตก่อนอัปเดตเส้นทาง ---
-                        if (routingControl) {
-                            if (navigator.onLine) {
-                                // ✅ มีเน็ต: สั่งให้ Routing Machine คำนวณเส้นใหม่จากจุดปัจจุบัน
-                                var wps = routingControl.getWaypoints();
-                                routingControl.setWaypoints([newStart, wps[1].latLng]);
-                            } else {
-                                // ❌ ไม่มีเน็ต: ไม่ต้องทำอะไรกับ routingControl (ปล่อยเส้นเดิมค้างไว้)
-                                console.log("Offline: Keeping static route");
-                            }
-                        }
-                        // ----------------------------------------
-
-                        // คำนวณระยะห่างเส้นตรง (Direct Distance) เพื่ออัปเดตตัวเลข
+                        // คำนวณระยะ
                         var dist = newStart.distanceTo(currentDestLatLng);
                         var distEl = document.getElementById('dist-remain');
-                        
                         if (navigator.onLine) {
                             distEl.innerText = "(" + Math.round(dist) + " m)";
                             distEl.style.color = "#cbd5e1";
                         } else {
                             distEl.innerText = "(" + Math.round(dist) + " m) [OFFLINE]";
-                            distEl.style.color = "#ff4757"; // สีแดงเตือน
+                            distEl.style.color = "#ff4757";
                         }
 
-                        // เช็คว่าถึงหรือยัง (ระยะน้อยกว่า 20 เมตร)
+                        // เช็คถึงที่หมาย
                         if (dist < 20) {
                             stopNavigation();
-                            alert("🎉 คุณเดินทางถึงที่หมายแล้ว! (You have arrived!)");
+                            alert("🎉 คุณเดินทางถึงที่หมายแล้ว!");
                             playBeep();
+                            return;
+                        }
+
+                        // อัปเดตเส้นทาง (ถ้าเดินเกิน 40 เมตร)
+                        if (routingControl && navigator.onLine) {
+                            if (lastRouteUpdatePos && newStart.distanceTo(lastRouteUpdatePos) < 40) {
+                                // ยังไม่ถึงระยะ ไม่ต้องทำอะไร
+                            } else {
+                                var wps = routingControl.getWaypoints();
+                                routingControl.setWaypoints([newStart, wps[1].latLng]);
+                                lastRouteUpdatePos = newStart; 
+                            }
                         }
 
                     }, function(err) { console.log(err); }, { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 });
 
-                } catch(e) {
-                    showLoading(false);
-                    alert("Routing Error: " + e.message);
-                }
-            }, function(err) {
-                showLoading(false);
-                alert("GPS Error: " + err.message);
-            }, { enableHighAccuracy: true });
+                } catch(e) { showLoading(false); alert("Error: " + e.message); }
+            }, function(err) { showLoading(false); alert("GPS Error: " + err.message); }, { enableHighAccuracy: true });
         }
 
         function stopNavigation() {
@@ -1034,19 +1116,99 @@ function startInternalNav(destLat, destLon) {
         }
 
         function updateTimer() { 
-            if (!startTime) return; 
-            var elapsed = Date.now() - startTime; 
+            // เปลี่ยนจากการใช้ startTime ตัวแปร เป็นการดึงจาก Storage แทน
+            var savedStartTime = localStorage.getItem('sos_start_time');
+            
+            if (!savedStartTime) return; 
+            
+            // คำนวณเวลาจาก เวลาปัจจุบัน - เวลาที่เริ่มกด
+            var elapsed = Date.now() - parseInt(savedStartTime); 
+            
             var totalSeconds = Math.floor(elapsed / 1000); 
             var h = Math.floor(totalSeconds / 3600); 
             var m = Math.floor((totalSeconds % 3600) / 60); 
             var s = totalSeconds % 60; 
+            
             var timeStr = `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`; 
-            document.getElementById('timer-display-stop').innerText = timeStr; 
-            document.getElementById('timer-display-start').innerText = timeStr; 
+            
+            // อัปเดตตัวเลขบนหน้าจอ
+            var timerStop = document.getElementById('timer-display-stop');
+            var timerStart = document.getElementById('timer-display-start');
+            if(timerStop) timerStop.innerText = timeStr; 
+            if(timerStart) timerStart.innerText = timeStr; 
         }
+
         function startTimer() { startTime = Date.now(); updateTimer(); timerInterval = setInterval(updateTimer, 1000); }
         function stopTimer() { clearInterval(timerInterval); timerInterval = null; var finalTime = document.getElementById('timer-display-stop').innerText; document.getElementById('timer-display-start').innerText = finalTime; document.getElementById('timer-display-stop').innerText = "00:00:00"; startTime = 0; }
-        function onPositionUpdate(pos) { var lat = pos.coords.latitude; var lng = pos.coords.longitude; var acc = pos.coords.accuracy; linePoints.push([lat, lng]); if (tempLine) mapReport.removeLayer(tempLine); tempLine = L.polyline(linePoints, {color: '#10b981', weight: 4}).addTo(mapReport); mapReport.setView([lat, lng], 16); document.getElementById('coord-text').innerText = `🏃 ${linePoints.length} pts (Acc: ${Math.round(acc)}m)`; if (accCircle) mapReport.removeLayer(accCircle); accCircle = L.circle([lat, lng], { radius: acc, color: '#10b981', fillColor: '#10b981', fillOpacity: 0.1, weight: 1 }).addTo(mapReport); }
+       
+
+function onPositionUpdate(pos) { 
+            var lat = pos.coords.latitude; 
+            var lng = pos.coords.longitude; 
+            var acc = pos.coords.accuracy; 
+            
+            // ------------------------------------------------------------------
+            // 🚨 PART A: ยิง SOS นัดแรกทันที (Instant Alert)
+            // ------------------------------------------------------------------
+            if (isSosAlertPending) {
+                isSosAlertPending = false; // ปิดสวิตช์ (ส่งครั้งเดียวพอ)
+                localStorage.setItem('session_sos_sent', 'true'); // จำว่าส่งแล้วใน Session นี้
+
+                // 1. เตรียมอีเมล (Override -> Input -> Saved)
+                var userEmail = localStorage.getItem('trek_emergency_override') 
+                              || document.getElementById('sos-email').value 
+                              || localStorage.getItem('trek_email_' + (currentUser ? currentUser.username : ""));
+                
+                // (หมายเหตุ: เราจะยังไม่ลบ trek_emergency_override ทิ้งตรงนี้ เผื่อไว้ใช้ตอนส่งสรุปปิดท้าย)
+
+                // 2. ระบุชื่อผู้ส่ง
+                var reporter = currentUser ? currentUser.username : getDeviceName();
+
+                // 3. สร้างชุดข้อมูล SOS Alert
+                var sosData = {
+                    lat: lat,
+                    lon: lng,
+                    level: "จุดอันตราย",
+                    desc: "🚨 SOS ACTIVATED! (Initial Location)", // หัวข้ออีเมลแจ้งเตือนแรก
+                    type: "point", // ส่งเป็นจุดพิกัดเดียว
+                    locationName: "SOS Start Point", 
+                    searchLocation: "SOS Alert", 
+                    province: "-", 
+                    reporterName: reporter,
+                    emergencyEmail: userEmail,
+                    timestamp: Date.now()
+                };
+
+                // 4. ส่งออกไป (พร้อมระบบ Retry 5 นาที ถ้าส่งไม่ผ่าน)
+                sendSosWithRetry(sosData);
+            }
+
+            // ------------------------------------------------------------------
+            // 🏃 PART B: บันทึกเส้นทาง (Tracking Logic)
+            // ------------------------------------------------------------------
+            
+            // เพิ่มจุดลงใน Array เส้นทาง
+            linePoints.push([lat, lng]); 
+
+            // ✅ Zombie Mode: บันทึกเส้นทางลงเครื่องทันที (กันเครื่องดับ/แอปเด้ง)
+            if (currentMode === 'track' || localStorage.getItem('is_sos_active') === 'true') {
+                localStorage.setItem('trek_saved_route', JSON.stringify(linePoints));
+            }
+
+            // วาดเส้นบนแผนที่
+            if (tempLine) mapReport.removeLayer(tempLine); 
+            tempLine = L.polyline(linePoints, {color: '#10b981', weight: 4}).addTo(mapReport); 
+            
+            // ขยับกล้องไปที่จุดล่าสุด
+            mapReport.setView([lat, lng], 16); 
+            
+            // อัปเดตข้อความบนหน้าจอ
+            document.getElementById('coord-text').innerText = `🏃 ${linePoints.length} pts (Acc: ${Math.round(acc)}m)`; 
+            
+            // วาดวงกลมความแม่นยำ
+            if (accCircle) mapReport.removeLayer(accCircle); 
+            accCircle = L.circle([lat, lng], { radius: acc, color: '#10b981', fillColor: '#10b981', fillOpacity: 0.1, weight: 1 }).addTo(mapReport); 
+        }
 
         function toggleTracking(shouldStart) {
             const trekForm = document.getElementById('trekForm');
@@ -1259,18 +1421,55 @@ function initMaps() {
             } 
         }
         
-        function checkAuth() { var u = sessionStorage.getItem('trekUser'); var n = sessionStorage.getItem('trekName'); if(u && n) { currentUser = { username: u, name: n }; showApp(); } else { showLogin(); } }
+   function checkAuth() { 
+            // ✅✅✅ อ่านจาก localStorage ✅✅✅
+            var u = localStorage.getItem('trekUser'); 
+            var n = localStorage.getItem('trekName'); 
+            
+            if(u && n) { 
+                currentUser = { username: u, name: n }; 
+                showApp(); 
+            } else { 
+                showLogin(); 
+            } 
+        }
         function showLogin() { document.getElementById('page-login').style.display = 'flex'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'none'; }
         function showRegister() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'flex'; }
         function showApp() { document.getElementById('page-login').style.display = 'none'; document.getElementById('page-register').style.display = 'none'; document.getElementById('app-container').style.display = 'block'; document.getElementById('display-username').innerText = "👤 " + currentUser.name; setTimeout(function(){ initMaps(); loadAllData(); if(mapReport) mapReport.invalidateSize(); }, 200); }
-        function doLogin() { var u=document.getElementById('login-user').value; var p=document.getElementById('login-pass').value; if(!u||!p) return; showLoading(true, getTxt('loading')); callApi('loginUser', { username: u, password: p }).then(res => { showLoading(false); if(res.status==='SUCCESS'){ sessionStorage.setItem('trekUser', u); sessionStorage.setItem('trekName', res.name); currentUser={username:u, name:res.name}; showApp(); } else { alert(getTxt('alertLoginFail')); } }); }
-        function doRegister() { var n=document.getElementById('reg-name').value; var u=document.getElementById('reg-user').value; var p=document.getElementById('reg-pass').value; if(!n||!u||!p) return; showLoading(true, getTxt('loading')); callApi('registerUser', { username: u, password: p, name: n }).then(res => { showLoading(false); if(res.status==='SUCCESS'){ alert("✅ OK"); showLogin(); } else { alert("Error: " + res.status); } }); }
+     function doLogin() { 
+            var u=document.getElementById('login-user').value; 
+            var p=document.getElementById('login-pass').value; 
+            if(!u||!p) return; 
+            
+            showLoading(true, getTxt('loading')); 
+            
+            callApi('loginUser', { username: u, password: p }).then(res => { 
+                showLoading(false); 
+                if(res.status==='SUCCESS'){ 
+                    // ✅✅✅ เปลี่ยนเป็น localStorage (อยู่ยาวตลอดไป) ✅✅✅
+                    localStorage.setItem('trekUser', u); 
+                    localStorage.setItem('trekName', res.name); 
+                    
+                    currentUser={username:u, name:res.name}; 
+                    showApp(); 
+                } else { 
+                    alert(getTxt('alertLoginFail')); 
+                } 
+            }); 
+        }
         
         function doLogout() { 
             if(confirm(getTxt('confirmLogout'))) { 
                 closeSettings();
-                sessionStorage.clear(); 
-                currentUser=null; 
+                
+                // ✅✅✅ ลบเฉพาะข้อมูล User ออกจากเครื่อง ✅✅✅
+                localStorage.removeItem('trekUser');
+                localStorage.removeItem('trekName');
+                
+                // (ถ้าอยากให้ปลอดภัย ลบอีเมลฉุกเฉินด้วยก็ได้ หรือจะเก็บไว้ก็ได้)
+                // localStorage.removeItem('trek_email_' + currentUser.username);
+
+                currentUser = null; 
                 location.reload(); 
             } 
         }
@@ -1584,6 +1783,70 @@ function drawSecurePath(points, color, popupContent) {
 
         applyLanguage(); 
         checkAuth();
+
+// ✅✅✅ [Zombie Mode Part 2] ระบบกู้ชีพเมื่อเปิดแอปใหม่ ✅✅✅
+        window.addEventListener('load', () => {
+            // 1. โหลดการตั้งค่าพื้นฐาน
+            updateSyncStatus();
+            syncOfflineData();
+            
+            // 2. เช็คว่ามี Login ค้างไว้ไหม (จะได้ไม่ต้อง Login ใหม่)
+            checkAuth(); 
+// 3. 🚨 SOS RETRY CHECK (ตรวจสอบคิว SOS ค้างท่อ)
+            // ถ้าเคยส่ง SOS แล้วเน็ตหลุด ระบบจะกู้คืนคิวส่งซ้ำให้ทันที
+            if (localStorage.getItem('pending_sos_packet')) {
+                console.log("⚠️ Found pending SOS packet. Restarting retry queue...");
+}
+                queueSosRetry(null); // เริ่มนับเวลาถอยหลังส่งใหม่
+            // 3. ตรวจสอบสถานะ SOS
+            var wasSOS = localStorage.getItem('is_sos_active') === 'true';
+            
+            if (wasSOS) {
+                console.log("⚠️ ZOMBIE MODE ACTIVATED: Resuming SOS...");
+
+                // รอสักพักให้ Map โหลดเสร็จ
+                setTimeout(() => {
+                    // A. กู้คืนเส้นทางเดิมจากความทรงจำ (LocalStorage)
+                    var savedRoute = localStorage.getItem('trek_saved_route');
+                    if (savedRoute) {
+                        try {
+                            linePoints = JSON.parse(savedRoute);
+                            // วาดเส้นเดิมกลับมาบนแผนที่
+                            if (linePoints.length > 0 && mapReport) {
+                                tempLine = L.polyline(linePoints, {color: '#10b981', weight: 4}).addTo(mapReport);
+                                // ซูมไปที่จุดล่าสุด
+                                var lastPt = linePoints[linePoints.length-1];
+                                mapReport.setView(lastPt, 16);
+                            }
+                        } catch(e) { console.error("Restore route error", e); }
+                    }
+
+                    // B. เปิดหน้าจอแดง (Overlay) กลับมา
+                    const overlay = document.getElementById('emergency-overlay');
+                    if(overlay) {
+                        overlay.style.display = 'flex'; 
+                        overlay.classList.add('sos-flashing'); 
+                    }
+
+                    // C. เล่นเสียงเงียบต่อ (เพื่อให้ทำงาน Background ได้)
+                    var audio = document.getElementById('sos-silent-player');
+                    if (audio) audio.play().catch(()=>{});
+
+                    // D. เริ่มจับ GPS ต่อทันที
+                    setMode('track');
+                    trackingStarted = true;
+                    if (navigator.geolocation) {
+                        watchId = navigator.geolocation.watchPosition(onPositionUpdate, (err) => console.log(err), { enableHighAccuracy: true });
+                        
+                        // กู้คืนเวลา (Timer)
+                        startTimer(); 
+                    }
+                    
+                }, 1000); // รอ 1 วินาทีให้แอปพร้อม
+            }
+        });
     </script>
+
+
 </body>
 </html>
