@@ -1319,40 +1319,65 @@ function startEmergencyModeLogin() {
     // 3. เรียกใช้งานโหมดฉุกเฉินหลัก
     startEmergencyMode();
 }
+
+
 function initMaps() { 
             if(mapReport) return; 
             
             try { 
                 var osmUrl = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'; 
                 var osmAttr = '© OSM'; 
-                var mapOpts = { maxZoom: 19, attribution: osmAttr }; 
                 
-                mapReport = L.map('map-report', { zoomControl: false, minZoom: 2, maxZoom: 19 }).setView([13.7563, 100.5018], 10); 
-                L.tileLayer(osmUrl, mapOpts).addTo(mapReport); 
+                // ตรวจสอบว่า Plugin โหลดติดไหม (กันเหนียว)
+                var isRotateAvailable = (L.Map.prototype.setBearing !== undefined);
+
+                // =========================================================
+                // 1. MAP REPORT (หน้าปักหมุด)
+                // =========================================================
+                mapReport = L.map('map-report', { 
+                    zoomControl: false, 
+                    minZoom: 2, 
+                    maxZoom: 19,
+                    
+                    // ✅ ตั้งค่าหมุนที่นี่ทีเดียว (ปลอดภัยสุด)
+                    rotate: true,       
+                    touchRotate: true,  
+                    
+                    // ✅ สั่งซ่อนปุ่มเข็มทิศตรงนี้เลย (ไม่ต้องใช้ CSS)
+                    rotateControl: false 
+                    
+                }).setView([13.7563, 100.5018], 10); 
                 
-                mapDashboard = L.map('map-dashboard', { zoomControl: false, minZoom: 2, rotate: true, rotateControl: {     // ปุ่มเข็มทิศ
-                        closeOnZeroBearing: false,
-                        position: 'topleft' // ไว้มุมซ้ายล่างจะได้เห็นชัด
-                    }, touchRotate: true, maxZoom: 19 }).setView([13.7563, 100.5018], 10); 
-                L.tileLayer(osmUrl, mapOpts).addTo(mapDashboard); 
+                L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttr }).addTo(mapReport); 
                 
+                // =========================================================
+                // 2. MAP DASHBOARD (หน้าแผนที่ใหญ่)
+                // =========================================================
+                mapDashboard = L.map('map-dashboard', { 
+                    zoomControl: false, 
+                    minZoom: 2, 
+                    maxZoom: 19,
+                    
+                    // ✅ ตั้งค่าหมุน
+                    rotate: true, 
+                    touchRotate: true,
+                    
+                    // ✅ ซ่อนปุ่มเข็มทิศ
+                    rotateControl: false
+                    
+                }).setView([13.7563, 100.5018], 10); 
+                
+                L.tileLayer(osmUrl, { maxZoom: 19, attribution: osmAttr }).addTo(mapDashboard); 
                 feedLayerGroup = L.layerGroup().addTo(mapDashboard);
 
-                // ---------------------------------------------------------
-                // 🛠️ กลับมาใช้ Nominatim (มาตรฐาน) แต่บังคับให้แสดงชื่อเต็ม
-                // ---------------------------------------------------------
+                // =========================================================
+                // 3. Search Box (ใส่กลับเข้ามา)
+                // =========================================================
                 var geocoder = L.Control.geocoder({ 
                     defaultMarkGeocode: false, 
-                    
-                    // ใช้ Nominatim (ตัวมาตรฐานของ OSM)
                     geocoder: L.Control.Geocoder.nominatim({
-                        geocodingQueryParams: {
-                            'accept-language': 'th,en', // ขอภาษาไทยถ้ามี
-                            'addressdetails': 1,        // ขอที่อยู่ละเอียด
-                            'limit': 10                 // ขอ 10 รายการ
-                        }
+                        geocodingQueryParams: { 'accept-language': 'th,en', 'addressdetails': 1, 'limit': 10 }
                     }),
-                    
                     placeholder: 'ค้นหาสถานที่...', 
                     collapsed: false, 
                     position: 'topright'
@@ -1361,34 +1386,21 @@ function initMaps() {
                     var center = e.geocode.center; 
                     mapReport.setView(center, 16); 
                     updateUserLocation(center.lat, center.lng, 0); 
-                    
-                    // แสดง Popup ยืนยันตำแหน่ง
                     var fullName = e.geocode.name || e.geocode.html;
-                    L.popup()
-                        .setLatLng(center)
-                        .setContent(`<div style="text-align:center; font-size:12px; width:200px;">
-                                        <b>📍 ตรวจสอบตำแหน่ง</b><br>
-                                        <div style="margin-top:5px; color:#555;">${fullName}</div>
-                                     </div>`)
-                        .openOn(mapReport);
+                    L.popup().setLatLng(center).setContent(`<div style="text-align:center; font-size:12px;"><b>📍 ${fullName}</b></div>`).openOn(mapReport);
                 })
                 .addTo(mapReport); 
-                // ---------------------------------------------------------
 
-                mapReport.on('click', function(e) { 
-                    updateUserLocation(e.latlng.lat, e.latlng.lng, 0); 
-                }); 
+                // Event คลิก
+                mapReport.on('click', function(e) { updateUserLocation(e.latlng.lat, e.latlng.lng, 0); }); 
 
                 setTimeout(function(){ 
                     if(mapReport) mapReport.invalidateSize(); 
-                    if(mapDashboard) mapDashboard.invalidateSize();
+                    if(mapDashboard) mapDashboard.invalidateSize(); 
                 }, 500); 
                 
             } catch (e) { console.error("Map Init Error:", e); } 
         }
-        
-
-
 
 
 
