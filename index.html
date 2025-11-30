@@ -221,7 +221,7 @@
         
         #emergency-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; z-index: 99999; display: none; flex-direction: column; align-items: center; justify-content: center; background-color: black; }
         .sos-flashing { animation: sosFlash 0.5s infinite alternate; }
-        @keyframes sosFlash { 0% { background-color: black; } 100% { background-color: #ff0000; } }
+        @keyframes sosFlash { 0% { background-color: black; } 100% { background-color: #03c2fc; } }
         .sos-text-big { font-size: 80px; font-weight: 900; color: white; letter-spacing: 5px; margin-bottom: 20px; }
         .sos-btn-stop { padding: 15px 40px; background: white; color: black; font-weight: bold; font-size: 24px; border-radius: 50px; border: none; cursor: pointer; box-shadow: 0 0 20px rgba(255,255,255,0.5); }
     </style>
@@ -443,18 +443,8 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script src="https://unpkg.com/leaflet-rotate@0.2.8/dist/leaflet-rotate-src.js"></script>
-function showLoading(show, text) { 
-            var overlay = document.getElementById('loading-overlay');
-            var txtElem = document.getElementById('loading-text');
-            
-            if (show) { 
-                if(txtElem) txtElem.innerText = text || "LOADING..."; 
-                if(overlay) overlay.style.display = 'flex'; 
-            } else { 
-                if(overlay) overlay.style.display = 'none'; 
-            } 
-        }
-</script>
+
+
 
 
     
@@ -856,14 +846,19 @@ function stopEmergencyMode() {
                     };
                     
                     callApi('saveData', payload).then(res => { 
-                        resetForm(); 
-                        switchTab('feed'); 
+ switchTab('feed');                       
+ setMode('point'); 
+                        
+                        // สลับไปหน้า Feed
+                       
                     });
                 } else {
                     resetForm();
+setMode('point'); 
                 }
             } else {
                 resetForm();
+setMode('point'); 
             }
         }
 
