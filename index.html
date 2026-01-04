@@ -643,6 +643,81 @@
       border: 1px solid rgba(148,163,184,.14);
     }
     .chip i{ color: var(--cyan); }
+
+    /* =========================================================
+       ✅ NEW: Tap-friendly buttons for Log cards + Popup NAV text black
+    ========================================================== */
+    .card-actions{
+      display:flex;
+      align-items:center;
+      gap:10px;
+    }
+
+    .card-btn{
+      appearance:none;
+      -webkit-appearance:none;
+      border: 1px solid rgba(148,163,184,.22);
+      background: rgba(2,6,23,.35);
+      color:#e2e8f0;
+      border-radius: 999px;
+      min-height: 44px;
+      min-width: 44px;
+      padding: 10px 14px;
+      font-weight: 900;
+      letter-spacing: .08em;
+      font-size: 12px;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      box-shadow: 0 12px 30px rgba(0,0,0,.22);
+      transition: transform .12s ease, box-shadow .12s ease, border-color .12s ease;
+    }
+    .card-btn:active{ transform: scale(.97); }
+    .card-btn:focus{
+      outline:none;
+      box-shadow: 0 0 0 3px rgba(6,182,212,.18), 0 12px 30px rgba(0,0,0,.22);
+      border-color: rgba(6,182,212,.55);
+    }
+    .card-btn.nav{
+      border-color: rgba(6,182,212,.45);
+      background: rgba(6,182,212,.16);
+      color:#e2e8f0;
+    }
+    .card-btn.del{
+      border-color: rgba(239,68,68,.40);
+      background: rgba(239,68,68,.14);
+      color:#fecaca;
+      padding: 0;
+      width: 44px;
+      height: 44px;
+    }
+    .card-btn i{ font-size: 16px; }
+
+    .popup-nav-btn{
+      appearance:none;
+      -webkit-appearance:none;
+      border: 1px solid rgba(6,182,212,.55);
+      background: rgba(103,232,249,.95);
+      color:#000; /* ✅ black text */
+      padding: 10px 14px;
+      border-radius: 999px;
+      min-height: 44px;
+      font-weight: 900;
+      letter-spacing: .06em;
+      cursor:pointer;
+      display:inline-flex;
+      align-items:center;
+      justify-content:center;
+      gap:10px;
+      box-shadow: 0 14px 40px rgba(0,0,0,.25);
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .popup-nav-btn:active{ transform: scale(.98); }
   </style>
 </head>
 
@@ -757,7 +832,7 @@
         </button>
 
         <div class="auth-link" onclick="showRegister()" id="link-reg">Create an Account</div>
-        <!-- ✅ GPS status removed (as you requested earlier) -->
+        <!-- ✅ GPS status removed -->
       </div>
     </div>
   </div>
@@ -871,9 +946,10 @@
           <textarea id="desc" rows="2" class="app-input" placeholder="Description..."></textarea>
 
           <div style="display:flex; gap:10px;">
-            <button type="button" class="submit-btn" onclick="navigateToPin()" id="btn-nav" style="flex:1;">
+            <button type="button" class="submit-btn" onclick="navigateToPin()" id="btn-nav" style="flex:1; display:none;">
               <i class="fa fa-location-arrow"></i> <span>NAVIGATE</span>
             </button>
+
             <button type="button" class="submit-btn" onclick="submitReport()" id="btn-save" style="flex:1; background: linear-gradient(135deg, rgba(59,130,246,.95), rgba(6,182,212,.85));">
               <i class="fa fa-thumb-tack"></i> <span>PIN</span>
             </button>
@@ -1297,7 +1373,7 @@
       }).catch(err => console.log("Weather Error:", err));
     }
 
-    // ✅ Language data (added "Me" + icon via getLevelIcon)
+    // ✅ Language data
     const langData = {
       th: {
         flag: "https://flagcdn.com/24x18/th.png",
@@ -2257,11 +2333,11 @@
       var c = getLevelColor(l);
       var displayTitle = getLevelDisplay(l);
       var btnTxt = getTxt('navInApp');
+
+      // ✅ Popup NAV: black text
       var popupContent = `<div style='text-align:center;'>
         <b>${displayTitle}</b><br>
-        <button onclick="onCardNavClick(${lat}, ${lon})"
-          style='margin-top:8px; background: rgba(6,182,212,.18); color:white; border:1px solid rgba(6,182,212,.35);
-                 padding:6px 10px; border-radius:999px; cursor:pointer; font-weight:800; letter-spacing:.06em;'>
+        <button type="button" class="popup-nav-btn" onclick="onCardNavClick(${lat}, ${lon})">
           <i class="fa fa-location-arrow"></i> ${btnTxt}
         </button>
       </div>`;
@@ -2301,17 +2377,20 @@
           var displayLevel = getLevelDisplay(r[3]);
           var icon = getLevelIcon(r[3]);
 
+          // ✅ Bigger delete button (tap-friendly)
           var deleteBtn = (r[8] === myUser)
-            ? `<span class="delete-btn" onclick="confirmDelete('${r[0]}'); event.stopPropagation();"
-                 style="margin-left:10px; color:#fecaca; cursor:pointer;"><i class="fa fa-trash"></i></span>`
+            ? `<button type="button" class="card-btn del" onclick="confirmDelete('${r[0]}'); event.stopPropagation();" aria-label="Delete">
+                 <i class="fa fa-trash"></i>
+               </button>`
             : "";
 
           var cardDesc = isLineOrTrack ? r[4].split(" || ")[1] : r[4];
 
-          var navBtn = `<button onclick="onCardNavClick(${r[1]}, ${r[2]}); event.stopPropagation();"
-            style="background:transparent; border:1px solid rgba(6,182,212,.45); color:#67e8f9;
-                   border-radius:999px; padding:4px 10px; font-size:11px; cursor:pointer; margin-left:8px; font-weight:800;">
-            <i class="fa fa-location-arrow"></i> NAV
+          // ✅ Bigger NAV button (tap-friendly) + language aware label
+          var navBtn = `<button type="button" class="card-btn nav"
+            onclick="onCardNavClick(${r[1]}, ${r[2]}); event.stopPropagation();" aria-label="Navigate">
+            <i class="fa fa-location-arrow"></i>
+            <span>${getTxt('btnNav')}</span>
           </button>`;
 
           html += `<div class="feed-card" style="border-left-color:${color}" onclick="focusOnCard('${r[0]}')">
@@ -2319,18 +2398,21 @@
               <span style="font-weight:900; font-size:14px; color:${color}; display:flex; align-items:center; gap:8px;">
                 <i class="fa ${icon}" style="color:${color}"></i> ${displayLevel}
               </span>
-              <div>
+              <div class="card-actions">
                 <span class="chip" style="color:#cbd5e1;"><i class="fa fa-user"></i> ${r[8]||'Guest'}</span>
                 ${deleteBtn}
               </div>
             </div>
+
             <div style="color:white; font-size:14px; font-weight:800; margin-bottom: 3px;">
               <i class="fa fa-map-marker" style="color: var(--cyan)"></i> ${cleanDesc}
             </div>
-            <div style="color:#94a3b8; font-size:12px; margin-bottom:8px; display:flex; gap:10px; align-items:center;">
+
+            <div style="color:#94a3b8; font-size:12px; margin-bottom:8px; display:flex; gap:10px; align-items:center; justify-content:space-between;">
               <span><i class="fa fa-clock-o"></i> ${dateStr} ${timeStr}</span>
               ${navBtn}
             </div>
+
             <div style="color:#cbd5e1; font-size:13px; border-top:1px solid rgba(148,163,184,.12); margin-top:6px; padding-top:8px;">
               <i class="fa fa-sticky-note-o" style="color: rgba(226,232,240,.75)"></i> ${cardDesc || '-'}
             </div>
@@ -2345,7 +2427,7 @@
       document.getElementById('feed-list').innerHTML = html;
     }
 
-    // ---------- Focus / Navigation (kept as-is from your version) ----------
+    // ---------- Focus / Navigation ----------
     var currentFocusTimer = null;
     function focusOnCard(timestamp) {
       if (currentFocusTimer) { clearTimeout(currentFocusTimer); currentFocusTimer = null; }
@@ -2390,11 +2472,11 @@
 
             var btnTxt = getTxt('navInApp');
             var displayTitle = getLevelDisplay(record[3]);
+
+            // ✅ Popup NAV: black text
             var popupContent = `<div style='text-align:center;'>
               <b>${displayTitle}</b><br>
-              <button onclick="onCardNavClick(${record[1]}, ${record[2]})"
-                style='margin-top:8px; background: rgba(6,182,212,.18); color:white; border:1px solid rgba(6,182,212,.35);
-                       padding:6px 10px; border-radius:999px; cursor:pointer; font-weight:800; letter-spacing:.06em;'>
+              <button type="button" class="popup-nav-btn" onclick="onCardNavClick(${record[1]}, ${record[2]})">
                 <i class="fa fa-location-arrow"></i> ${btnTxt}
               </button>
             </div>`;
@@ -2429,7 +2511,7 @@
       mapDashboard.setView([record[1], record[2]], 16, { animate: false });
     }
 
-    // ---------- Navigation core (same as your prior build) ----------
+    // ---------- Navigation core ----------
     var lastRouteUpdatePos = null;
 
     function startInternalNav(destLat, destLon, travelMode='driving') {
