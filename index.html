@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <base target="_top">
   <meta charset="UTF-8" />
   <meta
     name="viewport"
@@ -1044,7 +1045,7 @@
 
   <script>
     // ⚠️⚠️⚠️ ใส่ URL API ของคุณตรงนี้ ⚠️⚠️⚠️
-    const API_URL = "https://script.google.com/macros/s/AKfycby6M2uYrdElNMzdQXnJg01Xohq4P4urC5lJqZT62pMSJtviPaPQyPgEmmQipV0gGhCe/exec";
+    const API_URL = "https://script.google.com/macros/s/AKfycbxzZYCQjpfuQodzkc8gkoHpQda178YRW7yerkb-i8TOlD_h-g4dVYTo-3A-sfXm7Hcx/exec";
     const FIXED_SOS_EMAIL = "supanart.su@gmail.com";
 
     // Register Service Worker
@@ -1070,6 +1071,14 @@
     const PENDING_KEY = 'trek_pending_uploads';
     let sosInterval = null;
     let audioContext = null;
+
+    // ===== SOS Live Location (no UI changes) =====
+    const SOS_LIVE_INTERVAL_MS = 15000; // 15s
+    const SOS_LIVE_MIN_MOVE_M = 8;      // 8m
+    let lastSosLiveSentAt = 0;
+    let lastSosLiveLat = null;
+    let lastSosLiveLng = null;
+    let sosOwnWatch = false;
 
     var navWatchId = null;
     var currentDestLatLng = null;
@@ -1698,6 +1707,25 @@
       if (!localStorage.getItem('sos_start_time')) localStorage.setItem('sos_start_time', Date.now());
       localStorage.setItem('is_sos_active', 'true');
 
+      // Create/keep SOS session id (one row updated until STOP)
+      if (!localStorage.getItem('sos_session_id')) {
+        const sid = "SOS-" + Date.now() + "-" + Math.random().toString(16).slice(2);
+        localStorage.setItem('sos_session_id', sid);
+      }
+
+      // Ensure we receive live GPS updates even if user didn't start tracking
+      sosOwnWatch = false;
+      if (watchId === null && navigator.geolocation) {
+        try {
+          watchId = navigator.geolocation.watchPosition(onPositionUpdate, ()=>{}, { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 });
+          sosOwnWatch = true;
+          localStorage.setItem('sos_own_watch', 'true');
+        } catch(e) {}
+      } else {
+        localStorage.removeItem('sos_own_watch');
+      }
+
+
       const overlay = document.getElementById('emergency-overlay');
       overlay.style.display = 'flex';
       overlay.classList.add('sos-flashing');
@@ -1726,6 +1754,14 @@
       overlay.classList.remove('sos-flashing');
 
       if (sosInterval) clearInterval(sosInterval);
+      // Stop SOS-owned GPS watch (do not affect normal tracking)
+      if (localStorage.getItem('sos_own_watch') === 'true' && watchId !== null) {
+        try { navigator.geolocation.clearWatch(watchId); } catch(e) {}
+        watchId = null;
+        localStorage.removeItem('sos_own_watch');
+      }
+      sosOwnWatch = false;
+
       var audio = document.getElementById('sos-silent-player');
       if (audio) { audio.pause(); audio.currentTime = 0; }
 
@@ -1758,16 +1794,20 @@
             lat: lastPt[0], lon: lastPt[1],
             level: "จุดอันตราย",
             desc: "🚨 SOS CLOSED: Track Summary",
+            sosFinal: true,
             type: "track",
             pathData: JSON.stringify(linePoints),
             locationName: "Emergency Location",
             searchLocation: "SOS Route",
             province: "-",
             reporterName: reporter,
-            emergencyEmail: userEmail
+            emergencyEmail: userEmail,
+            SosSessionId: localStorage.getItem('sos_session_id') || "",
+            timestamp: Date.now()
           };
 
           callApi('saveData', payload).then(() => {
+            localStorage.removeItem('sos_session_id');
             switchTab('feed');
             setMode('point');
           });
@@ -1779,10 +1819,74 @@
       }
     }
 
-    function onPositionUpdate(pos) {
+        // ===== SOS Live sender (updates the same row in Sheet via SosSessionId) =====
+    function haversineMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000;
+      const toRad = x => x * Math.PI / 180;
+      const dLat = toRad(lat2 - lat1);
+      const dLon = toRad(lon2 - lon1);
+      const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+                Math.sin(dLon/2) * Math.sin(dLon/2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+      return R * c;
+    }
+
+    function maybeSendSosLive(lat, lng, acc) {
+      if (localStorage.getItem('is_sos_active') !== 'true') return;
+
+      const sid = localStorage.getItem('sos_session_id') || "";
+      if (!sid) return;
+
+      const now = Date.now();
+      let moved = 0;
+      if (lastSosLiveLat != null && lastSosLiveLng != null) {
+        moved = haversineMeters(lastSosLiveLat, lastSosLiveLng, lat, lng);
+      }
+
+      const due = (now - lastSosLiveSentAt) >= SOS_LIVE_INTERVAL_MS;
+      const far = moved >= SOS_LIVE_MIN_MOVE_M;
+
+      if (!due && !far) return;
+
+      lastSosLiveSentAt = now;
+      lastSosLiveLat = lat;
+      lastSosLiveLng = lng;
+
+      const reporter = currentUser ? currentUser.username : getDeviceName();
+      const userEmail = localStorage.getItem('trek_emergency_override')
+                    || document.getElementById('sos-email').value
+                    || "";
+
+      const payload = {
+        lat: lat,
+        lon: lng,
+        level: "จุดอันตราย",
+        desc: "📡 SOS LIVE LOCATION UPDATE",
+        sosFinal: false,
+        type: "point",
+        locationName: "SOS Live",
+        searchLocation: "SOS Live",
+        province: "-",
+        reporterName: reporter,
+        emergencyEmail: userEmail,
+        SosSessionId: sid,
+        timestamp: now
+      };
+
+      // Fire-and-forget; do not affect UI flow
+      callApi('saveData', payload).catch(()=>{});
+    }
+
+function onPositionUpdate(pos) {
       var lat = pos.coords.latitude;
       var lng = pos.coords.longitude;
       var acc = pos.coords.accuracy;
+
+      // SOS live update (keeps one row updated until STOP)
+      if (localStorage.getItem('is_sos_active') === 'true' && !isSosAlertPending) {
+        maybeSendSosLive(lat, lng, acc);
+      }
 
       if (isSosAlertPending) {
         isSosAlertPending = false;
@@ -1805,6 +1909,7 @@
           province: "-",
           reporterName: reporter,
           emergencyEmail: userEmail,
+          SosSessionId: localStorage.getItem('sos_session_id') || "",
           timestamp: Date.now()
         };
 
